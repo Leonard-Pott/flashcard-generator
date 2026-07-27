@@ -1,5 +1,5 @@
-import { Component, inject, signal } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component, computed, inject, signal } from '@angular/core';
+import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
 import { ApiService } from './core/services/api.service';
 import { Health } from './core/models/health';
@@ -11,7 +11,7 @@ type BackendState =
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -20,6 +20,18 @@ export class App {
 
   protected readonly title = signal('Karteikarten-Generator');
   protected readonly backend = signal<BackendState>({ kind: 'loading' });
+
+  protected readonly backendTooltip = computed(() => {
+    const state = this.backend();
+    switch (state.kind) {
+      case 'ok':
+        return `${state.health.application} · Stand ${state.health.timestamp}`;
+      case 'error':
+        return state.message;
+      default:
+        return 'Verbindung wird geprüft';
+    }
+  });
 
   constructor() {
     this.checkBackend();

@@ -1,6 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 
 import { App } from './app';
 import { environment } from '../environments/environment';
@@ -19,7 +20,7 @@ describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     }).compileComponents();
 
     httpMock = TestBed.inject(HttpTestingController);
@@ -33,7 +34,7 @@ describe('App', () => {
     httpMock.expectOne(healthUrl).flush(healthResponse);
   });
 
-  it('should render the health data once the backend responds', async () => {
+  it('should show backend and database state once health responds', async () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
 
@@ -41,8 +42,8 @@ describe('App', () => {
     await fixture.whenStable();
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('flashcard-generator');
-    expect(text).toContain('UP');
+    expect(text).toContain('Backend UP');
+    expect(text).toContain('DB UP');
   });
 
   it('should show a hint when the backend is unreachable', async () => {

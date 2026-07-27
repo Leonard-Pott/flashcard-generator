@@ -1,6 +1,9 @@
 .app-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
   padding: 1.5rem 2rem 1rem;
-  border-bottom: 1px solid var(--border);
 
   h1 {
     margin: 0;
@@ -13,85 +16,53 @@
   }
 }
 
-.app-main {
-  padding: 2rem;
-}
-
-.status-card {
-  max-width: 34rem;
-  padding: 1.25rem 1.5rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-
-  h2 {
-    margin: 0 0 0.75rem;
-    font-size: 1.1rem;
-  }
+.backend {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 
   button {
-    margin-top: 1rem;
-    padding: 0.45rem 0.9rem;
+    padding: 0.25rem 0.6rem;
     border: 1px solid var(--border);
     border-radius: 6px;
     background: transparent;
     color: inherit;
     cursor: pointer;
+  }
+}
+
+.app-nav {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0 2rem;
+  border-bottom: 1px solid var(--border);
+
+  a {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    text-decoration: none;
 
     &:hover {
-      border-color: var(--text-muted);
+      color: var(--text);
+    }
+
+    &.active {
+      border-bottom-color: var(--accent);
+      color: var(--text);
     }
   }
 }
 
-.status-details {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.4rem 1rem;
-  margin: 0;
-
-  dt {
-    color: var(--text-muted);
-  }
-
-  dd {
-    margin: 0;
-  }
-}
-
-.status {
-  margin: 0;
-
-  &--pending {
-    color: var(--text-muted);
-  }
-
-  &--down {
-    color: var(--down);
-  }
+.app-main {
+  padding: 2rem;
 }
 
 .hint {
-  margin: 0.75rem 0 0;
+  max-width: 40rem;
+  margin: 0 0 1.5rem;
   font-size: 0.9rem;
   color: var(--text-muted);
-}
-
-.badge {
-  display: inline-block;
-  padding: 0.05rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 600;
-
-  &--up {
-    background: color-mix(in srgb, var(--up) 18%, transparent);
-    color: var(--up);
-  }
-
-  &--down {
-    background: color-mix(in srgb, var(--down) 18%, transparent);
-    color: var(--down);
-  }
 }
 
 code {

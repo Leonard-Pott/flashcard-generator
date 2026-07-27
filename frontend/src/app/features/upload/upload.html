@@ -1,0 +1,92 @@
+<h2>Dokumente</h2>
+
+<div
+  class="dropzone"
+  [class.dropzone--active]="dragging()"
+  (dragover)="onDragOver($event)"
+  (dragleave)="onDragLeave($event)"
+  (drop)="onDrop($event)"
+>
+  <p class="dropzone__hint">Dateien hierher ziehen</p>
+  <p class="dropzone__formats">PDF, DOCX, PPTX, TXT oder Markdown &middot; maximal 25 MB pro Datei</p>
+  <label class="dropzone__button">
+    Dateien auswählen
+    <input
+      type="file"
+      multiple
+      accept=".pdf,.docx,.pptx,.txt,.md,.markdown"
+      (change)="onFilesSelected($event)"
+    />
+  </label>
+</div>
+
+@if (uploads().length > 0) {
+  <section class="uploads">
+    <h3>Uploads</h3>
+    <ul>
+      @for (entry of uploads(); track entry.filename) {
+        <li>
+          <span class="uploads__name">{{ entry.filename }}</span>
+          @switch (entry.state) {
+            @case ('pending') { <span class="badge">wartet</span> }
+            @case ('running') { <span class="badge">läuft …</span> }
+            @case ('done') { <span class="badge badge--up">fertig</span> }
+            @case ('error') { <span class="badge badge--down">Fehler</span> }
+          }
+          @if (entry.message) {
+            <span class="uploads__message">{{ entry.message }}</span>
+          }
+        </li>
+      }
+    </ul>
+    <button type="button" (click)="clearUploads()">Ausblenden</button>
+  </section>
+}
+
+@if (listError(); as error) {
+  <p class="error">{{ error }}</p>
+}
+
+@if (loading()) {
+  <p class="muted">Lade Dokumente …</p>
+} @else if (documents().length === 0) {
+  <p class="muted">Noch keine Dokumente hochgeladen.</p>
+} @else {
+  <table class="documents">
+    <thead>
+      <tr>
+        <th>Datei</th>
+        <th>Status</th>
+        <th class="numeric">Zeichen</th>
+        <th class="numeric">Größe</th>
+        <th>Hochgeladen</th>
+        <th><span class="visually-hidden">Aktionen</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (document of documents(); track document.id) {
+        <tr>
+          <td>
+            {{ document.filename }}
+            @if (document.errorMessage) {
+              <span class="documents__error">{{ document.errorMessage }}</span>
+            }
+          </td>
+          <td>
+            <span
+              class="badge"
+              [class.badge--up]="document.status === 'EXTRACTED'"
+              [class.badge--down]="document.status === 'FAILED'"
+            >{{ document.status }}</span>
+          </td>
+          <td class="numeric">{{ formatNumber(document.charCount) }}</td>
+          <td class="numeric">{{ formatBytes(document.sizeBytes) }}</td>
+          <td>{{ formatDate(document.uploadedAt) }}</td>
+          <td>
+            <button type="button" class="danger" (click)="deleteDocument(document)">Löschen</button>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+}

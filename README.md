@@ -7,8 +7,22 @@ Spezifikation und Meilensteine: [flashcard-generator-plan.md](flashcard-generato
 
 ## Stand
 
-**M1 — Grundgerüst** ist umgesetzt: Docker Compose mit Postgres 16, Spring Boot 3.5 mit
+**M1 — Grundgerüst**: Docker Compose mit Postgres 16, Spring Boot 3.5 mit
 Flyway-Baseline, Angular-Workspace, CORS für `localhost:4200`, `GET /api/health`.
+
+**M2 — Dokumenten-Upload**: Multipart-Upload mit Textextraktion über Apache Tika
+(PDF, DOCX, PPTX, TXT, Markdown), Ablage in Postgres, Liste mit Drag & Drop im Frontend.
+
+```
+POST   /api/documents      multipart/form-data, Feldname "file", max. 25 MB
+GET    /api/documents
+GET    /api/documents/{id}
+DELETE /api/documents/{id}
+```
+
+Gespeichert wird nur der extrahierte Text, nicht die Originaldatei. Ein Dokument ohne
+Textebene (typisch für gescannte PDFs) landet mit Status `FAILED` und einer Begründung
+in der Liste, statt den Upload abzulehnen.
 
 ## Voraussetzungen
 
@@ -49,7 +63,7 @@ curl http://localhost:8080/api/health
 
 ## Tests
 
-Backend:
+Backend (die Persistenz-Tests starten Postgres über Testcontainers, Docker muss laufen):
 
 ```bash
 mvn test
