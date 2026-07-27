@@ -28,3 +28,13 @@ export interface UpdateCardRequest {
   back?: string;
   tags?: string[];
 }
+
+/** Antwort von GET /api/decks/{id}/study/next. */
+export interface NextCard {
+  /** null, wenn für heute nichts mehr fällig ist. */
+  card: Card | null;
+  dueCount: number;
+  /** Gesetzt, wenn nichts fällig ist: wann die nächste Karte drankommt. */
+  nextDueDate: string | null;
+}
+

@@ -8,6 +8,9 @@
     @if (deck.description) {
       <span>{{ deck.description }}</span>
     }
+    @if (deck.cardCount > 0) {
+      <a class="study-link" [routerLink]="['/decks', deck.id, 'study']">Lernen</a>
+    }
   </p>
 }
 

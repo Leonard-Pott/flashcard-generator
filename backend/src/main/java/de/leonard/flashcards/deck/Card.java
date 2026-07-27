@@ -111,6 +111,15 @@ public class Card {
         touch();
     }
 
+    /** Uebernimmt das Ergebnis einer Bewertung; gerechnet wird es im study-Paket. */
+    public void recordReview(double easeFactor, int intervalDays, int repetitions, LocalDate dueDate) {
+        this.easeFactor = easeFactor;
+        this.intervalDays = intervalDays;
+        this.repetitions = repetitions;
+        this.dueDate = dueDate;
+        touch();
+    }
+
     private void touch() {
         this.updatedAt = Instant.now();
     }

@@ -1,0 +1,134 @@
+.breadcrumb {
+  margin: 0 0 0.75rem;
+
+  a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.9rem;
+
+    &:hover {
+      color: var(--text);
+    }
+  }
+}
+
+h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.3rem;
+}
+
+.counter {
+  margin: 0 0 1.25rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.card {
+  max-width: 40rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+
+  &__side {
+    padding: 1.5rem;
+
+    &--back {
+      border-top: 1px solid var(--border);
+      background: color-mix(in srgb, var(--accent) 6%, transparent);
+    }
+  }
+
+  &__label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+  }
+
+  &__text {
+    margin: 0;
+    font-size: 1.15rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+
+  &__tags {
+    margin: 0.75rem 0 0;
+
+    .badge + .badge {
+      margin-left: 0.25rem;
+    }
+  }
+}
+
+button {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    border-color: var(--text-muted);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  &.primary {
+    margin-top: 1.25rem;
+    border-color: var(--accent);
+    color: var(--accent);
+
+    &:hover {
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+    }
+  }
+}
+
+.ratings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  max-width: 40rem;
+  margin-top: 1.25rem;
+
+  button {
+    flex: 1 1 8rem;
+  }
+}
+
+kbd {
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--code-bg);
+  font-family: inherit;
+  font-size: 0.75em;
+  color: var(--text-muted);
+}
+
+.done {
+  margin: 1.5rem 0 0.5rem;
+  font-size: 1.15rem;
+}
+
+.error {
+  margin: 1rem 0 0;
+  color: var(--down);
+}
+
+.muted {
+  margin: 0.35rem 0 0;
+  color: var(--text-muted);
+}
+
+a {
+  color: var(--accent);
+}

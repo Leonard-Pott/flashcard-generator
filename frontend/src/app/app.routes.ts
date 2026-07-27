@@ -12,6 +12,12 @@ export const routes: Routes = [
     title: 'Stapel',
     loadComponent: () => import('./features/decks/decks').then((m) => m.DecksPage)
   },
+  // Die speziellere Route zuerst, damit sie nicht von 'decks/:id' verdeckt wird.
+  {
+    path: 'decks/:id/study',
+    title: 'Lernen',
+    loadComponent: () => import('./features/study/study').then((m) => m.StudyPage)
+  },
   {
     path: 'decks/:id',
     title: 'Stapel',

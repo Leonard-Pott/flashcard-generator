@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
-import { Card, CreateCardRequest, UpdateCardRequest } from '../models/card';
+import { Card, CreateCardRequest, NextCard, UpdateCardRequest } from '../models/card';
 import { CreateDeckRequest, Deck, UpdateDeckRequest } from '../models/deck';
 import { DocumentSummary } from '../models/document';
 import { GenerationJob, GenerationRequest } from '../models/generation';
@@ -70,6 +70,14 @@ export class ApiService {
 
   deleteCard(id: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/cards/${id}`);
+  }
+
+  nextCard(deckId: string): Observable<NextCard> {
+    return this.http.get<NextCard>(`${this.baseUrl}/decks/${deckId}/study/next`);
+  }
+
+  reviewCard(cardId: string, quality: number): Observable<Card> {
+    return this.http.post<Card>(`${this.baseUrl}/cards/${cardId}/review`, { quality });
   }
 
   createGenerationJob(request: GenerationRequest): Observable<GenerationJob> {

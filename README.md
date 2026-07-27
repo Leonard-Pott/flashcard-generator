@@ -82,6 +82,18 @@ Im Frontend werden Dokumente per Checkbox ausgewählt (nur solche mit extrahiert
 konfiguriert und gestartet; danach zeigt `/jobs/:id` den Fortschritt im Zwei-Sekunden-Takt
 samt geschätzter Restdauer.
 
+**M6 — Lernmodus (SM-2)**: Wiederholungslogik nach Abschnitt 10 des Plans, Endpunkte für
+fällige Karten und Bewertungen, Lern-View unter `/decks/:id/study`.
+
+```
+GET  /api/decks/{id}/study/next   fällige Karte, offene Anzahl, nächster Termin
+POST /api/cards/{id}/review       Body: { "quality": 0..5 }
+```
+
+Die vier Knöpfe des Lernmodus bilden auf SM-2-Bewertungen ab: Nochmal = 0, Schwer = 3,
+Gut = 4, Einfach = 5. Leertaste deckt auf, die Tasten 1 bis 4 bewerten. Neue Karten sind
+sofort fällig; eine verfehlte Karte kommt am Folgetag wieder.
+
 ## Voraussetzungen
 
 - JDK 21 oder neuer (getestet mit JDK 24)

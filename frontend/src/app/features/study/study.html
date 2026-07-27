@@ -1,0 +1,64 @@
+<p class="breadcrumb"><a [routerLink]="['/decks', id()]">← Zurück zum Stapel</a></p>
+
+@if (deck(); as deck) {
+  <h2>{{ deck.name }}</h2>
+}
+
+@if (error(); as message) {
+  <p class="error">{{ message }}</p>
+}
+
+@if (loading()) {
+  <p class="muted">Lade Karte …</p>
+} @else if (card(); as card) {
+  <p class="counter">
+    Noch {{ dueCount() }} fällig
+    @if (reviewedCount() > 0) {
+      · {{ reviewedCount() }} bearbeitet
+    }
+  </p>
+
+  <article class="card">
+    <div class="card__side">
+      <span class="card__label">Vorderseite</span>
+      <p class="card__text">{{ card.front }}</p>
+    </div>
+
+    @if (revealed()) {
+      <div class="card__side card__side--back">
+        <span class="card__label">Rückseite</span>
+        <p class="card__text">{{ card.back }}</p>
+        @if (card.tags.length > 0) {
+          <p class="card__tags">
+            @for (tag of card.tags; track tag) {
+              <span class="badge">{{ tag }}</span>
+            }
+          </p>
+        }
+      </div>
+    }
+  </article>
+
+  @if (!revealed()) {
+    <button type="button" class="primary" (click)="reveal()">Aufdecken <kbd>Leertaste</kbd></button>
+  } @else {
+    <div class="ratings">
+      @for (rating of ratings; track rating.quality) {
+        <button type="button" [disabled]="saving()" (click)="rate(rating.quality)">
+          {{ rating.label }} <kbd>{{ rating.key }}</kbd>
+        </button>
+      }
+    </div>
+  }
+} @else {
+  <p class="done">Für heute geschafft.</p>
+  @if (reviewedCount() > 0) {
+    <p class="muted">{{ reviewedCount() }} Karte(n) in dieser Sitzung bearbeitet.</p>
+  }
+  @if (nextDueDate(); as next) {
+    <p class="muted">Die nächste Karte ist am {{ formatDate(next) }} fällig.</p>
+  } @else {
+    <p class="muted">Dieser Stapel enthält noch keine Karten.</p>
+  }
+  <p><a [routerLink]="['/decks', id()]">Zum Stapel</a></p>
+}
