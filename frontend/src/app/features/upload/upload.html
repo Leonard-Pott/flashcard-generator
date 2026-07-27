@@ -55,6 +55,7 @@
   <table class="documents">
     <thead>
       <tr>
+        <th><span class="visually-hidden">Auswahl</span></th>
         <th>Datei</th>
         <th>Status</th>
         <th class="numeric">Zeichen</th>
@@ -66,6 +67,15 @@
     <tbody>
       @for (document of documents(); track document.id) {
         <tr>
+          <td>
+            <input
+              type="checkbox"
+              [checked]="isSelected(document)"
+              [disabled]="document.status !== 'EXTRACTED'"
+              [attr.aria-label]="'Dokument ' + document.filename + ' auswählen'"
+              (change)="toggleSelection(document)"
+            />
+          </td>
           <td>
             {{ document.filename }}
             @if (document.errorMessage) {
@@ -89,4 +99,67 @@
       }
     </tbody>
   </table>
+
+  <section class="generate">
+    <h3>Karten generieren</h3>
+
+    @if (selectedCount() === 0) {
+      <p class="muted">
+        Wähle links die Dokumente aus, aus denen Karten entstehen sollen.
+        Dokumente ohne extrahierten Text lassen sich nicht auswählen.
+      </p>
+    } @else {
+      <p class="muted">
+        {{ selectedCount() }} Dokument(e) ausgewählt · geschätzt {{ estimate().chunks }} Abschnitte,
+        etwa {{ estimate().minutes }} Minuten
+      </p>
+    }
+
+    <form (ngSubmit)="startGeneration()">
+      <label>
+        Zielstapel
+        <select name="targetDeckId" [(ngModel)]="targetDeckId">
+          <option value="">Neuer Stapel …</option>
+          @for (deck of decks(); track deck.id) {
+            <option [value]="deck.id">{{ deck.name }} ({{ deck.cardCount }})</option>
+          }
+        </select>
+      </label>
+
+      @if (targetDeckId === '') {
+        <label>
+          Name des neuen Stapels
+          <input name="newDeckName" [(ngModel)]="newDeckName" placeholder="z. B. ITIL Service Design" />
+        </label>
+      }
+
+      <label>
+        Sprache
+        <select name="language" [(ngModel)]="language">
+          <option value="de">Deutsch</option>
+          <option value="en">Englisch</option>
+        </select>
+      </label>
+
+      <label>
+        Karten je Abschnitt
+        <input name="cardsPerChunk" type="number" min="1" max="20" [(ngModel)]="cardsPerChunk" />
+      </label>
+
+      <label>
+        Stil
+        <select name="style" [(ngModel)]="style">
+          <option value="QA">Frage und Antwort</option>
+          <option value="CLOZE">Lückentext</option>
+          <option value="DEFINITION">Begriff und Definition</option>
+        </select>
+      </label>
+
+      <button type="submit" [disabled]="!canStart()">Karten generieren</button>
+    </form>
+
+    @if (generationError(); as message) {
+      <p class="error">{{ message }}</p>
+    }
+  </section>
 }

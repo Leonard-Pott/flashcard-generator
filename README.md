@@ -63,6 +63,25 @@ LLM_PROBE_ENABLED=true mvn spring-boot:run
 curl -X POST http://localhost:8080/api/llm/probe -H "Content-Type: application/json" -d "{\"userPrompt\":\"Erstelle zwei Lernkarten zum Begriff Incident.\"}"
 ```
 
+**M5 — Generierung**: Chunking (6.000 Zeichen, 300 Overlap, Trennung an Absatzgrenzen),
+Prompting je Sprache und Kartenstil, defensives JSON-Parsen, Deduplizierung und asynchrone
+Verarbeitung mit Fortschritts-Polling.
+
+```
+POST /api/generation-jobs      → 202 Accepted, Verarbeitung läuft im Hintergrund
+GET  /api/generation-jobs/{id} → Fortschritt für das Polling
+GET  /api/generation-jobs
+```
+
+Die Abschnitte werden **nacheinander** verarbeitet — der Free Tier verträgt keine
+parallelen Aufrufe. Scheitert ein Abschnitt endgültig, wird er übersprungen und im Job
+vermerkt; der Lauf geht weiter. Nur wenn kein einziger Abschnitt durchkommt, gilt der Job
+als `FAILED`.
+
+Im Frontend werden Dokumente per Checkbox ausgewählt (nur solche mit extrahiertem Text),
+konfiguriert und gestartet; danach zeigt `/jobs/:id` den Fortschritt im Zwei-Sekunden-Takt
+samt geschätzter Restdauer.
+
 ## Voraussetzungen
 
 - JDK 21 oder neuer (getestet mit JDK 24)

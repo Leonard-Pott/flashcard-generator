@@ -7,6 +7,8 @@ import de.leonard.flashcards.deck.DeckNotFoundException;
 import de.leonard.flashcards.deck.InvalidDeckException;
 import de.leonard.flashcards.document.DocumentNotFoundException;
 import de.leonard.flashcards.document.InvalidUploadException;
+import de.leonard.flashcards.generation.GenerationJobNotFoundException;
+import de.leonard.flashcards.generation.InvalidGenerationRequestException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,13 +33,18 @@ public class ApiExceptionHandler {
     @ExceptionHandler({
             DocumentNotFoundException.class,
             DeckNotFoundException.class,
-            CardNotFoundException.class
+            CardNotFoundException.class,
+            GenerationJobNotFoundException.class
     })
     public ProblemDetail handleNotFound(RuntimeException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
     }
 
-    @ExceptionHandler({InvalidUploadException.class, InvalidDeckException.class})
+    @ExceptionHandler({
+            InvalidUploadException.class,
+            InvalidDeckException.class,
+            InvalidGenerationRequestException.class
+    })
     public ProblemDetail handleInvalidRequest(RuntimeException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
     }

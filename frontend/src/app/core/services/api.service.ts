@@ -6,6 +6,7 @@ import { environment } from '../../../environments/environment';
 import { Card, CreateCardRequest, UpdateCardRequest } from '../models/card';
 import { CreateDeckRequest, Deck, UpdateDeckRequest } from '../models/deck';
 import { DocumentSummary } from '../models/document';
+import { GenerationJob, GenerationRequest } from '../models/generation';
 import { Health } from '../models/health';
 
 /**
@@ -69,5 +70,13 @@ export class ApiService {
 
   deleteCard(id: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/cards/${id}`);
+  }
+
+  createGenerationJob(request: GenerationRequest): Observable<GenerationJob> {
+    return this.http.post<GenerationJob>(`${this.baseUrl}/generation-jobs`, request);
+  }
+
+  generationJob(id: string): Observable<GenerationJob> {
+    return this.http.get<GenerationJob>(`${this.baseUrl}/generation-jobs/${id}`);
   }
 }

@@ -17,5 +17,10 @@ export const routes: Routes = [
     title: 'Stapel',
     loadComponent: () => import('./features/decks/deck-detail').then((m) => m.DeckDetailPage)
   },
+  {
+    path: 'jobs/:id',
+    title: 'Generierung',
+    loadComponent: () => import('./features/jobs/job-progress').then((m) => m.JobProgressPage)
+  },
   { path: '**', redirectTo: 'upload' }
 ];

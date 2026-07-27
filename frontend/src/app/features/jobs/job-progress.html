@@ -1,0 +1,66 @@
+<p class="breadcrumb"><a routerLink="/upload">← Dokumente</a></p>
+
+<h2>Kartengenerierung</h2>
+
+@if (error(); as message) {
+  <p class="error">{{ message }}</p>
+}
+
+@if (job(); as job) {
+  <p class="meta">
+    <span
+      class="badge"
+      [class.badge--up]="job.status === 'COMPLETED'"
+      [class.badge--down]="job.status === 'FAILED'"
+    >{{ statusLabel(job.status) }}</span>
+    @if (job.llmModel) {
+      <span>Modell: {{ job.llmModel }}</span>
+    }
+  </p>
+
+  <div
+    class="progress"
+    role="progressbar"
+    [attr.aria-valuenow]="percent()"
+    aria-valuemin="0"
+    aria-valuemax="100"
+  >
+    <div class="progress__bar" [style.width.%]="percent()"></div>
+  </div>
+
+  <p class="progress__label">
+    {{ job.processedChunks }} von {{ job.totalChunks }} Abschnitten · {{ percent() }} %
+    @if (!isFinished(job) && job.totalChunks > 0) {
+      · noch etwa {{ remainingMinutes() }} Minuten
+    }
+  </p>
+
+  <dl class="facts">
+    <dt>Erzeugte Karten</dt>
+    <dd>{{ job.generatedCardCount }}</dd>
+    @if (job.skippedChunks > 0) {
+      <dt>Übersprungene Abschnitte</dt>
+      <dd>{{ job.skippedChunks }}</dd>
+    }
+    <dt>Stil</dt>
+    <dd>{{ job.style }}</dd>
+    <dt>Sprache</dt>
+    <dd>{{ job.language }}</dd>
+  </dl>
+
+  @if (job.errorMessage) {
+    <p class="note" [class.error]="job.status === 'FAILED'">{{ job.errorMessage }}</p>
+  }
+
+  @if (job.status === 'COMPLETED' && job.targetDeckId) {
+    <button type="button" class="primary" (click)="openDeck()">Zum Stapel</button>
+  }
+  @if (job.status === 'FAILED' && job.targetDeckId) {
+    <p class="note">
+      Der Stapel wurde bereits angelegt.
+      <a [routerLink]="['/decks', job.targetDeckId]">Trotzdem ansehen</a>
+    </p>
+  }
+} @else if (!error()) {
+  <p class="muted">Lade Lauf …</p>
+}

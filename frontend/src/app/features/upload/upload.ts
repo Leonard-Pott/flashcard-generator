@@ -1,8 +1,12 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { concatMap, from } from 'rxjs';
 
 import { ApiService } from '../../core/services/api.service';
 import { DocumentSummary } from '../../core/models/document';
+import { Deck, Language } from '../../core/models/deck';
+import { CardStyle } from '../../core/models/generation';
 import { apiErrorMessage } from '../../core/api-error';
 
 interface UploadEntry {
@@ -11,13 +15,18 @@ interface UploadEntry {
   message?: string;
 }
 
+/** Wert der Zieldeck-Auswahl, wenn ein neuer Stapel angelegt werden soll. */
+const NEW_DECK = '';
+
 @Component({
   selector: 'app-upload',
+  imports: [FormsModule],
   templateUrl: './upload.html',
   styleUrl: './upload.scss'
 })
 export class UploadPage {
   private readonly api = inject(ApiService);
+  private readonly router = inject(Router);
 
   protected readonly documents = signal<DocumentSummary[]>([]);
   protected readonly loading = signal(true);
@@ -25,8 +34,91 @@ export class UploadPage {
   protected readonly dragging = signal(false);
   protected readonly uploads = signal<UploadEntry[]>([]);
 
+  protected readonly decks = signal<Deck[]>([]);
+  protected readonly selectedIds = signal<ReadonlySet<string>>(new Set());
+  protected readonly starting = signal(false);
+  protected readonly generationError = signal<string | null>(null);
+
+  protected targetDeckId = NEW_DECK;
+  protected newDeckName = '';
+  protected language: Language = 'de';
+  protected cardsPerChunk = 5;
+  protected style: CardStyle = 'QA';
+
+  protected readonly selectedCount = computed(() => this.selectedIds().size);
+  protected readonly canStart = computed(() => this.selectedCount() > 0 && !this.starting());
+
+  /**
+   * Grobe Schätzung: rund 6.000 Zeichen je Abschnitt, und die Drosselung lässt nur
+   * etwa 10 Anfragen pro Minute zu. Der Free Tier ist langsam — besser vorher sagen.
+   */
+  protected readonly estimate = computed(() => {
+    const characters = this.documents()
+      .filter((document) => this.selectedIds().has(document.id))
+      .reduce((sum, document) => sum + document.charCount, 0);
+    const chunks = Math.max(1, Math.ceil(characters / 6000));
+    return { chunks, minutes: Math.max(1, Math.ceil(chunks / 10)) };
+  });
+
   constructor() {
     this.loadDocuments();
+    this.loadDecks();
+  }
+
+  private loadDecks(): void {
+    this.api.decks().subscribe({
+      next: (decks) => this.decks.set(decks),
+      error: () => this.decks.set([])
+    });
+  }
+
+  protected isSelected(document: DocumentSummary): boolean {
+    return this.selectedIds().has(document.id);
+  }
+
+  protected toggleSelection(document: DocumentSummary): void {
+    this.selectedIds.update((current) => {
+      const next = new Set(current);
+      if (!next.delete(document.id)) {
+        next.add(document.id);
+      }
+      return next;
+    });
+  }
+
+  protected startGeneration(): void {
+    const documentIds = [...this.selectedIds()];
+    if (documentIds.length === 0) {
+      this.generationError.set('Bitte mindestens ein Dokument auswählen.');
+      return;
+    }
+
+    const usesNewDeck = this.targetDeckId === NEW_DECK;
+    if (usesNewDeck && this.newDeckName.trim().length === 0) {
+      this.generationError.set('Bitte einen Namen für den neuen Stapel angeben.');
+      return;
+    }
+
+    this.starting.set(true);
+    this.api
+      .createGenerationJob({
+        documentIds,
+        deckId: usesNewDeck ? null : this.targetDeckId,
+        newDeckName: usesNewDeck ? this.newDeckName.trim() : null,
+        language: this.language,
+        cardsPerChunk: this.cardsPerChunk,
+        style: this.style
+      })
+      .subscribe({
+        next: (job) => {
+          this.starting.set(false);
+          this.router.navigate(['/jobs', job.id]);
+        },
+        error: (err: unknown) => {
+          this.generationError.set(apiErrorMessage(err));
+          this.starting.set(false);
+        }
+      });
   }
 
   protected loadDocuments(): void {
@@ -113,7 +205,14 @@ export class UploadPage {
 
   protected deleteDocument(document: DocumentSummary): void {
     this.api.deleteDocument(document.id).subscribe({
-      next: () => this.documents.update((current) => current.filter((d) => d.id !== document.id)),
+      next: () => {
+        this.documents.update((current) => current.filter((d) => d.id !== document.id));
+        this.selectedIds.update((current) => {
+          const next = new Set(current);
+          next.delete(document.id);
+          return next;
+        });
+      },
       error: (err: unknown) => this.listError.set(this.messageOf(err))
     });
   }
