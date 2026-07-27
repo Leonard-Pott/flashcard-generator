@@ -32,6 +32,24 @@ server:
   # Single-User, kein Auth: nur lokal erreichbar.
   address: 127.0.0.1
 
+llm:
+  gemini:
+    # Ausschliesslich aus der Umgebung, niemals im Repository.
+    api-key: ${GEMINI_API_KEY:}
+    # Modellnamen aendern sich haeufiger als der Rest. Achtung: In GET /v1beta/models
+    # gelistet zu sein reicht nicht - gemini-2.5-flash steht dort, wird fuer neue Keys
+    # aber mit HTTP 404 abgelehnt. Geprueft und nutzbar: gemini-3.6-flash, gemini-3.5-flash.
+    model: gemini-3.6-flash
+    base-url: https://generativelanguage.googleapis.com/v1beta
+    requests-per-minute: 10
+    max-retries: 4
+    initial-backoff: 2s
+    timeout: 90s
+  # Testendpunkt fuer einen echten Aufruf gegen Gemini. Standardmaessig aus, weil jeder
+  # Aufruf vom Tageskontingent des Free Tier abgeht.
+  probe:
+    enabled: ${LLM_PROBE_ENABLED:false}
+
 app:
   cors:
     allowed-origins: http://localhost:4200

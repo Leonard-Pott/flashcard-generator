@@ -43,6 +43,26 @@ DELETE /api/cards/{id}
 Neue Karten starten mit den SM-2-Werten aus dem Plan (`easeFactor` 2.5, `intervalDays` 0,
 `repetitions` 0) und sind sofort fällig. Ausgewertet werden diese Felder erst in M6.
 
+**M4 — Gemini-Anbindung**: `LlmClient`-Interface mit `GeminiLlmClient` als einziger
+Implementierung, inklusive Drosselung auf `requests-per-minute` und Wiederholung mit
+exponentiellem Backoff (2s/4s/8s/16s) bei HTTP 429, 5xx und Netzwerkfehlern.
+
+Der API-Key kommt ausschließlich aus der Umgebungsvariable `GEMINI_API_KEY`. Das Modell
+steht in `application.yml` unter `llm.gemini.model`; eingetragen ist `gemini-3.6-flash`.
+Achtung: In der Modellliste der API aufzutauchen heißt nicht, dass ein Modell nutzbar ist —
+`gemini-2.5-flash` steht dort, wird für neue Keys aber mit HTTP 404 abgelehnt.
+
+Für einen einmaligen echten Aufruf gibt es einen Testendpunkt, der standardmäßig aus ist,
+weil jeder Aufruf vom Tageskontingent abgeht:
+
+```bash
+LLM_PROBE_ENABLED=true mvn spring-boot:run
+```
+
+```bash
+curl -X POST http://localhost:8080/api/llm/probe -H "Content-Type: application/json" -d "{\"userPrompt\":\"Erstelle zwei Lernkarten zum Begriff Incident.\"}"
+```
+
 ## Voraussetzungen
 
 - JDK 21 oder neuer (getestet mit JDK 24)
