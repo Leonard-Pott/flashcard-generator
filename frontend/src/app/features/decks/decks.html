@@ -1,0 +1,61 @@
+<h2>Stapel</h2>
+
+<form class="new-deck" (ngSubmit)="createDeck()">
+  <label>
+    Name
+    <input name="name" [(ngModel)]="newName" placeholder="z. B. ITIL Service Design" />
+  </label>
+  <label>
+    Beschreibung
+    <input name="description" [(ngModel)]="newDescription" placeholder="optional" />
+  </label>
+  <label>
+    Sprache
+    <select name="language" [(ngModel)]="newLanguage">
+      <option value="de">Deutsch</option>
+      <option value="en">Englisch</option>
+    </select>
+  </label>
+  <button type="submit" [disabled]="creating()">Stapel anlegen</button>
+</form>
+
+@if (error(); as message) {
+  <p class="error">{{ message }}</p>
+}
+
+@if (loading()) {
+  <p class="muted">Lade Stapel …</p>
+} @else if (decks().length === 0) {
+  <p class="muted">Noch keine Stapel angelegt.</p>
+} @else {
+  <table class="decks">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Sprache</th>
+        <th class="numeric">Karten</th>
+        <th>Angelegt</th>
+        <th><span class="visually-hidden">Aktionen</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (deck of decks(); track deck.id) {
+        <tr>
+          <td>
+            <a [routerLink]="['/decks', deck.id]">{{ deck.name }}</a>
+            @if (deck.description) {
+              <span class="decks__description">{{ deck.description }}</span>
+            }
+          </td>
+          <td><span class="badge">{{ deck.language }}</span></td>
+          <td class="numeric">{{ deck.cardCount }}</td>
+          <td>{{ formatDate(deck.createdAt) }}</td>
+          <td>
+            <button type="button" class="danger" (click)="deleteDeck(deck)">Löschen</button>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+  <p class="hint">Das Löschen eines Stapels entfernt auch alle darin enthaltenen Karten.</p>
+}

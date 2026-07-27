@@ -1,9 +1,9 @@
-import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { concatMap, from } from 'rxjs';
 
 import { ApiService } from '../../core/services/api.service';
 import { DocumentSummary } from '../../core/models/document';
+import { apiErrorMessage } from '../../core/api-error';
 
 interface UploadEntry {
   filename: string;
@@ -152,15 +152,7 @@ export class UploadPage {
     );
   }
 
-  /** ProblemDetail des Backends auswerten, sonst eine allgemeine Meldung. */
   private messageOf(err: unknown): string {
-    if (err instanceof HttpErrorResponse) {
-      if (err.status === 0) {
-        return 'Backend nicht erreichbar.';
-      }
-      const detail = (err.error as { detail?: string } | null)?.detail;
-      return detail ?? `Fehler ${err.status}: ${err.statusText}`;
-    }
-    return 'Unbekannter Fehler.';
+    return apiErrorMessage(err);
   }
 }

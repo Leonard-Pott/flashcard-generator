@@ -1,0 +1,86 @@
+<p class="breadcrumb"><a routerLink="/decks">← Alle Stapel</a></p>
+
+@if (deck(); as deck) {
+  <h2>{{ deck.name }}</h2>
+  <p class="meta">
+    <span class="badge">{{ deck.language }}</span>
+    <span>{{ deck.cardCount }} Karten</span>
+    @if (deck.description) {
+      <span>{{ deck.description }}</span>
+    }
+  </p>
+}
+
+@if (error(); as message) {
+  <p class="error">{{ message }}</p>
+}
+
+<form class="new-card" (ngSubmit)="addCard()">
+  <label>
+    Vorderseite
+    <textarea name="front" rows="2" [(ngModel)]="newFront" placeholder="Frage"></textarea>
+  </label>
+  <label>
+    Rückseite
+    <textarea name="back" rows="2" [(ngModel)]="newBack" placeholder="Antwort"></textarea>
+  </label>
+  <label>
+    Tags
+    <input name="tags" [(ngModel)]="newTags" placeholder="kommagetrennt, optional" />
+  </label>
+  <button type="submit">Karte hinzufügen</button>
+</form>
+
+@if (loading()) {
+  <p class="muted">Lade Karten …</p>
+} @else if (cards().length === 0) {
+  <p class="muted">Dieser Stapel enthält noch keine Karten.</p>
+} @else {
+  <table class="cards">
+    <thead>
+      <tr>
+        <th>Vorderseite</th>
+        <th>Rückseite</th>
+        <th>Tags</th>
+        <th>Fällig</th>
+        <th><span class="visually-hidden">Aktionen</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (card of cards(); track card.id) {
+        @if (editingId() === card.id) {
+          <tr class="editing">
+            <td><textarea name="editFront" rows="3" [(ngModel)]="editFront"></textarea></td>
+            <td><textarea name="editBack" rows="3" [(ngModel)]="editBack"></textarea></td>
+            <td><input name="editTags" [(ngModel)]="editTags" placeholder="kommagetrennt" /></td>
+            <td>{{ formatDate(card.dueDate) }}</td>
+            <td class="actions">
+              <button type="button" (click)="saveEdit(card)">Speichern</button>
+              <button type="button" (click)="cancelEdit()">Abbrechen</button>
+            </td>
+          </tr>
+        } @else {
+          <tr>
+            <td>{{ card.front }}</td>
+            <td>
+              {{ card.back }}
+              @if (card.sourceExcerpt) {
+                <span class="cards__source" [title]="card.sourceExcerpt">Quelle vorhanden</span>
+              }
+            </td>
+            <td>
+              @for (tag of card.tags; track tag) {
+                <span class="badge">{{ tag }}</span>
+              }
+            </td>
+            <td>{{ formatDate(card.dueDate) }}</td>
+            <td class="actions">
+              <button type="button" (click)="startEdit(card)">Bearbeiten</button>
+              <button type="button" class="danger" (click)="deleteCard(card)">Löschen</button>
+            </td>
+          </tr>
+        }
+      }
+    </tbody>
+  </table>
+}

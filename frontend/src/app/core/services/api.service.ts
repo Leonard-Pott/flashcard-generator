@@ -3,12 +3,14 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
+import { Card, CreateCardRequest, UpdateCardRequest } from '../models/card';
+import { CreateDeckRequest, Deck, UpdateDeckRequest } from '../models/deck';
 import { DocumentSummary } from '../models/document';
 import { Health } from '../models/health';
 
 /**
  * Einziger Zugangspunkt zum Backend. Weitere Endpunkte kommen mit den
- * folgenden Meilensteinen (Decks, Karten, Jobs, Lernmodus, Export).
+ * folgenden Meilensteinen (Jobs, Lernmodus, Export).
  */
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -31,5 +33,41 @@ export class ApiService {
 
   deleteDocument(id: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/documents/${id}`);
+  }
+
+  decks(): Observable<Deck[]> {
+    return this.http.get<Deck[]>(`${this.baseUrl}/decks`);
+  }
+
+  deck(id: string): Observable<Deck> {
+    return this.http.get<Deck>(`${this.baseUrl}/decks/${id}`);
+  }
+
+  createDeck(request: CreateDeckRequest): Observable<Deck> {
+    return this.http.post<Deck>(`${this.baseUrl}/decks`, request);
+  }
+
+  updateDeck(id: string, request: UpdateDeckRequest): Observable<Deck> {
+    return this.http.patch<Deck>(`${this.baseUrl}/decks/${id}`, request);
+  }
+
+  deleteDeck(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/decks/${id}`);
+  }
+
+  cards(deckId: string): Observable<Card[]> {
+    return this.http.get<Card[]>(`${this.baseUrl}/decks/${deckId}/cards`);
+  }
+
+  createCard(deckId: string, request: CreateCardRequest): Observable<Card> {
+    return this.http.post<Card>(`${this.baseUrl}/decks/${deckId}/cards`, request);
+  }
+
+  updateCard(id: string, request: UpdateCardRequest): Observable<Card> {
+    return this.http.patch<Card>(`${this.baseUrl}/cards/${id}`, request);
+  }
+
+  deleteCard(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/cards/${id}`);
   }
 }

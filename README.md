@@ -24,6 +24,25 @@ Gespeichert wird nur der extrahierte Text, nicht die Originaldatei. Ein Dokument
 Textebene (typisch für gescannte PDFs) landet mit Status `FAILED` und einer Begründung
 in der Liste, statt den Upload abzulehnen.
 
+**M3 — Deck- und Card-CRUD**: Stapel und Karten anlegen, ändern und löschen; im Frontend
+Stapelliste und Kartentabelle mit Inline-Bearbeitung.
+
+```
+GET    /api/decks                 mit Kartenzahl je Stapel
+POST   /api/decks
+GET    /api/decks/{id}
+PATCH  /api/decks/{id}            nur gesendete Felder werden geändert
+DELETE /api/decks/{id}            löscht auch die Karten des Stapels
+
+GET    /api/decks/{id}/cards
+POST   /api/decks/{id}/cards
+PATCH  /api/cards/{id}
+DELETE /api/cards/{id}
+```
+
+Neue Karten starten mit den SM-2-Werten aus dem Plan (`easeFactor` 2.5, `intervalDays` 0,
+`repetitions` 0) und sind sofort fällig. Ausgewertet werden diese Felder erst in M6.
+
 ## Voraussetzungen
 
 - JDK 21 oder neuer (getestet mit JDK 24)
