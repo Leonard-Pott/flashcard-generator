@@ -1,0 +1,44 @@
+<header class="app-header">
+  <h1>{{ title() }}</h1>
+  <p class="subtitle">Dokumente hochladen, Karteikarten generieren, lernen.</p>
+</header>
+
+<main class="app-main">
+  <section class="status-card">
+    <h2>Backend-Verbindung</h2>
+
+    @let state = backend();
+
+    @if (state.kind === 'loading') {
+      <p class="status status--pending">Prüfe Verbindung zum Backend …</p>
+    } @else if (state.kind === 'ok') {
+      <dl class="status-details">
+        <dt>Anwendung</dt>
+        <dd>{{ state.health.application }}</dd>
+        <dt>Status</dt>
+        <dd><span class="badge badge--up">{{ state.health.status }}</span></dd>
+        <dt>Datenbank</dt>
+        <dd>
+          <span
+            class="badge"
+            [class.badge--up]="state.health.database === 'UP'"
+            [class.badge--down]="state.health.database !== 'UP'"
+          >{{ state.health.database }}</span>
+        </dd>
+        <dt>Zeitstempel</dt>
+        <dd>{{ state.health.timestamp }}</dd>
+      </dl>
+    } @else {
+      <p class="status status--down">Backend nicht erreichbar: {{ state.message }}</p>
+      <p class="hint">
+        Läuft das Backend auf <code>http://localhost:8080</code>? Zuerst Postgres mit
+        <code>docker compose up -d</code> starten, dann im Ordner <code>backend</code>
+        <code>mvn spring-boot:run</code> ausführen.
+      </p>
+    }
+
+    <button type="button" (click)="checkBackend()">Erneut prüfen</button>
+  </section>
+
+  <router-outlet />
+</main>
