@@ -94,6 +94,23 @@ Die vier Knöpfe des Lernmodus bilden auf SM-2-Bewertungen ab: Nochmal = 0, Schw
 Gut = 4, Einfach = 5. Leertaste deckt auf, die Tasten 1 bis 4 bewerten. Neue Karten sind
 sofort fällig; eine verfehlte Karte kommt am Folgetag wieder.
 
+**M7 — Export**: CSV für Excel und TSV für Anki.
+
+```
+GET /api/decks/{id}/export?format=csv    Semikolon-getrennt, UTF-8 mit BOM
+GET /api/decks/{id}/export?format=anki   Tabulator-getrennt, ohne Kopfzeile
+```
+
+In der Stapelansicht stehen beide als Links neben „Lernen". Der Dateiname entsteht aus dem
+Stapelnamen (`Prüfung: ITIL & Co. 2026` wird zu `Prufung-ITIL-Co-2026.csv`).
+
+Unterschiede der Formate: CSV bekommt eine Kopfzeile und ein BOM, damit Excel die Umlaute
+richtig liest; Felder mit Semikolon, Anführungszeichen oder Zeilenumbruch werden nach
+RFC 4180 maskiert. Anki bekommt keins von beidem — es würde die Kopfzeile als erste Karte
+importieren. Da TSV keine Maskierung kennt, werden dort Zeilenumbrüche zu `<br>` und
+Tabulatoren zu Leerzeichen; Leerzeichen in Tags werden zu Bindestrichen, weil Anki Tags am
+Leerzeichen trennt.
+
 ## Voraussetzungen
 
 - JDK 21 oder neuer (getestet mit JDK 24)

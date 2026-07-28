@@ -7,6 +7,7 @@ import de.leonard.flashcards.deck.DeckNotFoundException;
 import de.leonard.flashcards.deck.InvalidDeckException;
 import de.leonard.flashcards.document.DocumentNotFoundException;
 import de.leonard.flashcards.document.InvalidUploadException;
+import de.leonard.flashcards.export.InvalidExportFormatException;
 import de.leonard.flashcards.generation.GenerationJobNotFoundException;
 import de.leonard.flashcards.generation.InvalidGenerationRequestException;
 
@@ -43,7 +44,8 @@ public class ApiExceptionHandler {
     @ExceptionHandler({
             InvalidUploadException.class,
             InvalidDeckException.class,
-            InvalidGenerationRequestException.class
+            InvalidGenerationRequestException.class,
+            InvalidExportFormatException.class
     })
     public ProblemDetail handleInvalidRequest(RuntimeException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());

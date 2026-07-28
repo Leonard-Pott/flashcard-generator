@@ -95,6 +95,27 @@ describe('DeckDetailPage', () => {
     expect(text()).toContain('Dieser Stapel enthält noch keine Karten.');
   });
 
+  it('should offer both export formats as direct links', async () => {
+    await loadWith([card()]);
+
+    const links = [...(fixture.nativeElement as HTMLElement).querySelectorAll('.exports a')];
+    expect(links.map((link) => link.getAttribute('href'))).toEqual([
+      `${environment.apiBaseUrl}/decks/${deckId}/export?format=csv`,
+      `${environment.apiBaseUrl}/decks/${deckId}/export?format=anki`,
+    ]);
+  });
+
+  it('should not offer an export for an empty deck', async () => {
+    // Der Export haengt an cardCount des Stapels, nicht an der geladenen Kartenliste.
+    await fixture.whenStable();
+    httpMock.expectOne(deckUrl).flush({ ...deck, cardCount: 0 });
+    await fixture.whenStable();
+    httpMock.expectOne(cardsUrl).flush([]);
+    await fixture.whenStable();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('.exports')).toBeNull();
+  });
+
   it('should add a card with parsed tags', async () => {
     await loadWith([]);
 

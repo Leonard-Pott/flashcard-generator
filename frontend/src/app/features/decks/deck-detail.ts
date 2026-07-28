@@ -144,6 +144,10 @@ export class DeckDetailPage {
       .filter((tag) => tag.length > 0);
   }
 
+  protected exportUrl(format: 'csv' | 'anki'): string {
+    return this.api.exportUrl(this.id(), format);
+  }
+
   protected formatDate(iso: string): string {
     return new Intl.DateTimeFormat('de-DE', { dateStyle: 'short' }).format(new Date(iso));
   }

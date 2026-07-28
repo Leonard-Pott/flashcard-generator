@@ -10,6 +10,11 @@
     }
     @if (deck.cardCount > 0) {
       <a class="study-link" [routerLink]="['/decks', deck.id, 'study']">Lernen</a>
+      <span class="exports">
+        Export:
+        <a [href]="exportUrl('csv')" download>CSV</a>
+        <a [href]="exportUrl('anki')" download>Anki</a>
+      </span>
     }
   </p>
 }

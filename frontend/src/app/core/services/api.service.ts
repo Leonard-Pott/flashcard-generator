@@ -72,6 +72,14 @@ export class ApiService {
     return this.http.delete<void>(`${this.baseUrl}/cards/${id}`);
   }
 
+  /**
+   * Adresse des Exports. Wird als normaler Link geöffnet, nicht per XHR geladen —
+   * den Download übernimmt dann der Browser anhand von Content-Disposition.
+   */
+  exportUrl(deckId: string, format: 'csv' | 'anki'): string {
+    return `${this.baseUrl}/decks/${deckId}/export?format=${format}`;
+  }
+
   nextCard(deckId: string): Observable<NextCard> {
     return this.http.get<NextCard>(`${this.baseUrl}/decks/${deckId}/study/next`);
   }

@@ -25,6 +25,8 @@ public class CorsConfig implements WebMvcConfigurer {
                 .allowedOrigins(allowedOrigins)
                 .allowedMethods("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
+                // Ohne diese Freigabe kaeme das Frontend beim Export nicht an den Dateinamen.
+                .exposedHeaders("Content-Disposition")
                 .maxAge(3600);
     }
 }

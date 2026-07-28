@@ -38,6 +38,21 @@ h2 {
   }
 }
 
+.exports {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  a {
+    color: var(--accent);
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
 .new-card {
   display: flex;
   flex-wrap: wrap;
