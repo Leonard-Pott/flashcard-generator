@@ -37,7 +37,11 @@ public class GenerationController {
     @GetMapping("/budget")
     public GenerationBudgetResponse budget() {
         return new GenerationBudgetResponse(
-                llmClient.modelName(), llmClient.dailyRequestBudget(), llmClient.requestsPerMinute());
+                llmClient.modelName(),
+                llmClient.dailyRequestBudget(),
+                llmClient.requestsPerMinute(),
+                TextChunker.TARGET_SIZE,
+                GenerationRequest.DEFAULT_CARDS_PER_CHUNK);
     }
 
     /**

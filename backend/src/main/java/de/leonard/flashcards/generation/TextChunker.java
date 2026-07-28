@@ -12,9 +12,19 @@ import org.springframework.stereotype.Component;
 @Component
 public class TextChunker {
 
-    static final int TARGET_SIZE = 6_000;
-    static final int OVERLAP = 300;
-    static final int MINIMUM_SIZE = 200;
+    /**
+     * 30.000 Zeichen statt der urspruenglich geplanten 6.000. Der Grund ist nicht das
+     * Modell - dessen Kontextfenster fasst ein Vielfaches davon -, sondern das
+     * Tageskontingent: Jeder Abschnitt ist eine Anfrage, und der Free Tier erlaubt nur
+     * 20 pro Tag. Mit 6.000 Zeichen reicht das fuer 120.000 Zeichen Lernstoff, mit
+     * 30.000 fuer 600.000.
+     */
+    public static final int TARGET_SIZE = 30_000;
+
+    static final int OVERLAP = 500;
+
+    /** Kuerzere Reste sind Deckblaetter, Quellenverzeichnisse oder Seitenzahlen. */
+    static final int MINIMUM_SIZE = 400;
 
     /**
      * Ein Absatzumbruch wird nur akzeptiert, wenn er im letzten Viertel des Abschnitts

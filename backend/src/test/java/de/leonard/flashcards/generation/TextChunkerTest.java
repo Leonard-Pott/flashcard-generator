@@ -12,8 +12,10 @@ class TextChunkerTest {
 
     @Test
     void shortTextStaysOneChunk() {
-        String text = "Ein kurzer Absatz. ".repeat(20);
+        // Auch mehrere Seiten Text bleiben ein Abschnitt - das ist der Sinn der 30.000 Zeichen.
+        String text = "Ein Absatz mit Inhalt ueber Service Management. ".repeat(400);
 
+        assertThat(text.length()).isLessThan(TextChunker.TARGET_SIZE);
         assertThat(chunker.chunk(text)).hasSize(1);
     }
 
@@ -27,13 +29,23 @@ class TextChunkerTest {
 
     @Test
     void splitsLongTextIntoSeveralChunks() {
-        String text = "Satz ueber Service Management. ".repeat(1_000); // rund 31.000 Zeichen
+        String text = "Satz ueber Service Management. ".repeat(5_000); // rund 155.000 Zeichen
 
         List<String> chunks = chunker.chunk(text);
 
         assertThat(chunks).hasSizeGreaterThan(4);
         assertThat(chunks).allSatisfy(chunk ->
                 assertThat(chunk.length()).isLessThanOrEqualTo(TextChunker.TARGET_SIZE));
+    }
+
+    @Test
+    void aTypicalLectureScriptNeedsOnlyAHandfulOfRequests() {
+        // Das PDF aus dem gescheiterten Lauf: rund 139.000 Zeichen ergaben mit 6.000
+        // Zeichen je Abschnitt 25 Anfragen - mehr als das Tageskontingent hergibt.
+        String text = "Ein Satz ueber Service Management und Verfuegbarkeit. ".repeat(2_600);
+
+        assertThat(text.length()).isCloseTo(139_000, org.assertj.core.data.Offset.offset(2_000));
+        assertThat(chunker.chunk(text)).hasSizeLessThanOrEqualTo(6);
     }
 
     @Test

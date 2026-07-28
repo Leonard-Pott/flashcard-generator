@@ -34,17 +34,19 @@ public class GenerationRunner {
     private final GenerationJobStore store;
     private final DocumentRepository documentRepository;
     private final TextChunker chunker;
+    private final ChunkFilter chunkFilter;
     private final CardPromptFactory promptFactory;
     private final CardJsonParser parser;
     private final CardDeduplicator deduplicator;
     private final LlmClient llmClient;
 
     public GenerationRunner(GenerationJobStore store, DocumentRepository documentRepository,
-                            TextChunker chunker, CardPromptFactory promptFactory, CardJsonParser parser,
-                            CardDeduplicator deduplicator, LlmClient llmClient) {
+                            TextChunker chunker, ChunkFilter chunkFilter, CardPromptFactory promptFactory,
+                            CardJsonParser parser, CardDeduplicator deduplicator, LlmClient llmClient) {
         this.store = store;
         this.documentRepository = documentRepository;
         this.chunker = chunker;
+        this.chunkFilter = chunkFilter;
         this.promptFactory = promptFactory;
         this.parser = parser;
         this.deduplicator = deduplicator;
@@ -149,8 +151,15 @@ public class GenerationRunner {
                 job.getCardsPerChunk());
     }
 
+    /**
+     * Abschnitte einsammeln und die aussortieren, die keinen Lernstoff enthalten. Sie
+     * gehen gar nicht erst in die Zaehlung ein - sonst wuerde der Fortschritt Anfragen
+     * versprechen, die nie gestellt werden.
+     */
     private List<Chunk> collectChunks(List<UUID> documentIds) {
         List<Chunk> chunks = new ArrayList<>();
+        int discarded = 0;
+
         for (UUID documentId : documentIds) {
             Document document = documentRepository.findById(documentId).orElse(null);
             if (document == null || document.getExtractedText() == null) {
@@ -158,8 +167,18 @@ public class GenerationRunner {
                 continue;
             }
             for (String text : chunker.chunk(document.getExtractedText())) {
-                chunks.add(new Chunk(documentId, text, chunks.size()));
+                ChunkFilter.Verdict verdict = chunkFilter.judge(text);
+                if (verdict.usable()) {
+                    chunks.add(new Chunk(documentId, text, chunks.size()));
+                } else {
+                    discarded++;
+                    log.debug("Abschnitt aus '{}' verworfen: {}", document.getFilename(), verdict.reason());
+                }
             }
+        }
+
+        if (discarded > 0) {
+            log.info("{} Abschnitte ohne Lernstoff aussortiert, das spart ebenso viele Anfragen", discarded);
         }
         return chunks;
     }

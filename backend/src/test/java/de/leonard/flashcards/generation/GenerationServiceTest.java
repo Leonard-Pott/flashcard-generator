@@ -87,7 +87,8 @@ class GenerationServiceTest {
 
         assertThat(job.getLanguage()).isEqualTo(Language.DE);
         assertThat(job.getStyle()).isEqualTo(CardStyle.QA);
-        assertThat(job.getCardsPerChunk()).isEqualTo(5);
+        // Passend zu den 30.000 Zeichen je Abschnitt.
+        assertThat(job.getCardsPerChunk()).isEqualTo(15);
     }
 
     @Test

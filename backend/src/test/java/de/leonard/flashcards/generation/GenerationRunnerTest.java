@@ -35,7 +35,9 @@ import de.leonard.flashcards.llm.LlmException;
 @ExtendWith(MockitoExtension.class)
 class GenerationRunnerTest {
 
-    private static final String SENTENCE = "Ein Satz ueber Service Management. ";
+    /** Die vierstellige Nummer sorgt fuer genug unterschiedliche Woerter je Abschnitt. */
+    private static final String SENTENCE =
+            "Regel %04d: Ein Satz ueber Service Management und die Verfuegbarkeit von Diensten. ";
 
     @Mock
     private GenerationJobStore store;
@@ -57,7 +59,7 @@ class GenerationRunnerTest {
 
     @BeforeEach
     void setUp() {
-        runner = new GenerationRunner(store, documentRepository, chunker,
+        runner = new GenerationRunner(store, documentRepository, chunker, new ChunkFilter(),
                 new CardPromptFactory(), new CardJsonParser(new ObjectMapper()),
                 new CardDeduplicator(), llmClient);
 
@@ -265,11 +267,23 @@ class GenerationRunnerTest {
     }
 
     private String oneChunk() {
-        return SENTENCE.repeat(30);
+        return text(40);
     }
 
     /** Lang genug fuer mehrere Abschnitte; die genaue Zahl steht in expectedChunks. */
     private String severalChunks() {
-        return SENTENCE.repeat(600);
+        return text(1_500);
+    }
+
+    /**
+     * Durchnummerierte Saetze statt eines wiederholten. Ein wiederholter Satz haette zu
+     * wenig unterschiedliche Woerter und wuerde vom ChunkFilter zu Recht aussortiert.
+     */
+    private String text(int sentences) {
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < sentences; i++) {
+            builder.append(SENTENCE.formatted(i));
+        }
+        return builder.toString();
     }
 }

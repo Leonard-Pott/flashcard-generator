@@ -52,7 +52,10 @@ class GenerationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.model").value("gemini-3.6-flash"))
                 .andExpect(jsonPath("$.dailyRequestBudget").value(20))
-                .andExpect(jsonPath("$.requestsPerMinute").value(10));
+                .andExpect(jsonPath("$.requestsPerMinute").value(10))
+                // Damit das Frontend nach derselben Regel schaetzt wie der Server rechnet.
+                .andExpect(jsonPath("$.charactersPerChunk").value(30000))
+                .andExpect(jsonPath("$.defaultCardsPerChunk").value(15));
     }
 
     @Test
@@ -98,7 +101,7 @@ class GenerationControllerTest {
                                 {"documentIds": ["%s"], "newDeckName": "Neu", "cardsPerChunk": 50}
                                 """.formatted(UUID.randomUUID())))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value("cardsPerChunk muss zwischen 1 und 20 liegen."));
+                .andExpect(jsonPath("$.detail").value("cardsPerChunk muss zwischen 1 und 40 liegen."));
     }
 
     @Test

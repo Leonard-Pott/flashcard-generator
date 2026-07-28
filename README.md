@@ -69,9 +69,14 @@ LLM_PROBE_ENABLED=true mvn spring-boot:run
 curl -X POST http://localhost:8080/api/llm/probe -H "Content-Type: application/json" -d "{\"userPrompt\":\"Erstelle zwei Lernkarten zum Begriff Incident.\"}"
 ```
 
-**M5 — Generierung**: Chunking (6.000 Zeichen, 300 Overlap, Trennung an Absatzgrenzen),
+**M5 — Generierung**: Chunking (30.000 Zeichen, 500 Overlap, Trennung an Absatzgrenzen),
 Prompting je Sprache und Kartenstil, defensives JSON-Parsen, Deduplizierung und asynchrone
 Verarbeitung mit Fortschritts-Polling.
+
+Die Abschnittsgröße ist am Tageskontingent ausgerichtet, nicht am Modell: Jeder Abschnitt
+ist eine Anfrage, und davon gibt es nur 20 pro Tag. Ein Vorlesungsskript mit 139.000
+Zeichen braucht damit 5 Anfragen statt 25. Abschnitte ohne Lernstoff — Deckblätter,
+Inhaltsverzeichnisse, Seitenzahlen — werden vorher aussortiert und kosten keine Anfrage.
 
 ```
 POST /api/generation-jobs      → 202 Accepted, Verarbeitung läuft im Hintergrund

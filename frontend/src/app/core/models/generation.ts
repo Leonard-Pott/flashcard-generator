@@ -36,6 +36,9 @@ export interface GenerationBudget {
   model: string;
   dailyRequestBudget: number;
   requestsPerMinute: number;
+  /** Zeichen je Abschnitt — Grundlage der Schätzung, kommt vom Server. */
+  charactersPerChunk: number;
+  defaultCardsPerChunk: number;
 }
 
 export function isFinished(job: GenerationJob): boolean {

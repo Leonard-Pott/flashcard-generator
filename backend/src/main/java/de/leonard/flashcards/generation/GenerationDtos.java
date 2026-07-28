@@ -27,12 +27,16 @@ public final class GenerationDtos {
             @Size(max = 200, message = "Der Stapelname darf hoechstens 200 Zeichen lang sein.")
             String newDeckName,
             Language language,
-            @Min(value = 1, message = "cardsPerChunk muss zwischen 1 und 20 liegen.")
-            @Max(value = 20, message = "cardsPerChunk muss zwischen 1 und 20 liegen.")
+            @Min(value = 1, message = "cardsPerChunk muss zwischen 1 und 40 liegen.")
+            @Max(value = 40, message = "cardsPerChunk muss zwischen 1 und 40 liegen.")
             Integer cardsPerChunk,
             CardStyle style) {
 
-        public static final int DEFAULT_CARDS_PER_CHUNK = 5;
+        /**
+         * Passend zu den 30.000 Zeichen je Abschnitt. Bei nur fuenf Karten pro Anfrage
+         * ginge aus so viel Text der grosse Rest verloren.
+         */
+        public static final int DEFAULT_CARDS_PER_CHUNK = 15;
 
         public Language languageOrDefault() {
             return language != null ? language : Language.DE;
@@ -51,7 +55,13 @@ public final class GenerationDtos {
      * Rahmenbedingungen des Tarifs, damit das Frontend vor einem zu grossen Lauf
      * warnen kann, statt ihn zur Haelfte im Kontingent stecken zu lassen.
      */
-    public record GenerationBudgetResponse(String model, int dailyRequestBudget, int requestsPerMinute) {
+    public record GenerationBudgetResponse(
+            String model,
+            int dailyRequestBudget,
+            int requestsPerMinute,
+            /** Damit das Frontend die Abschnittszahl nach derselben Regel schaetzt wie der Server rechnet. */
+            int charactersPerChunk,
+            int defaultCardsPerChunk) {
     }
 
     public record GenerationJobResponse(

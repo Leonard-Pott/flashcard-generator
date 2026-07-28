@@ -20,6 +20,8 @@ public class CardPromptFactory {
                 Kartenstil: %s
 
                 Regeln:
+                - Der Text kann lang sein und mehrere Themen umfassen. Verteile die Karten
+                  ueber den gesamten Text, nicht nur ueber den Anfang.
                 - Eine Karte prueft genau einen Sachverhalt.
                 - Die Vorderseite ist ohne Kenntnis des Dokuments verstaendlich. Formulierungen
                   wie "Was zeigt die Abbildung?" oder "Was steht auf dieser Folie?" sind verboten.

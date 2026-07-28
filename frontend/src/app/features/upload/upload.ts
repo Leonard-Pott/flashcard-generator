@@ -42,7 +42,8 @@ export class UploadPage {
   protected targetDeckId = NEW_DECK;
   protected newDeckName = '';
   protected language: Language = 'de';
-  protected cardsPerChunk = 5;
+  /** Wird beim Laden durch den Wert vom Server ersetzt. */
+  protected cardsPerChunk = 15;
   protected style: CardStyle = 'QA';
 
   protected readonly selectedCount = computed(() => this.selectedIds().size);
@@ -51,16 +52,17 @@ export class UploadPage {
   protected readonly budget = signal<GenerationBudget | null>(null);
 
   /**
-   * Grobe Schätzung: rund 6.000 Zeichen je Abschnitt. Jeder Abschnitt ist eine Anfrage
-   * ans Modell — daran hängt sowohl die Dauer als auch der Verbrauch am Tageskontingent.
+   * Jeder Abschnitt ist eine Anfrage ans Modell — daran hängt sowohl die Dauer als auch
+   * der Verbrauch am Tageskontingent. Die Abschnittsgröße kommt vom Server, damit hier
+   * nicht eine zweite Zahl gepflegt werden muss, die von der echten abweichen kann.
    */
   protected readonly estimate = computed(() => {
     const characters = this.documents()
       .filter((document) => this.selectedIds().has(document.id))
       .reduce((sum, document) => sum + document.charCount, 0);
-    const chunks = Math.max(1, Math.ceil(characters / 6000));
-    const perMinute = this.budget()?.requestsPerMinute ?? 10;
-    return { chunks, minutes: Math.max(1, Math.ceil(chunks / perMinute)) };
+    const budget = this.budget();
+    const chunks = Math.max(1, Math.ceil(characters / (budget?.charactersPerChunk ?? 30000)));
+    return { chunks, minutes: Math.max(1, Math.ceil(chunks / (budget?.requestsPerMinute ?? 10))) };
   });
 
   /**
@@ -92,7 +94,10 @@ export class UploadPage {
 
   private loadBudget(): void {
     this.api.generationBudget().subscribe({
-      next: (budget) => this.budget.set(budget),
+      next: (budget) => {
+        this.budget.set(budget);
+        this.cardsPerChunk = budget.defaultCardsPerChunk;
+      },
       // Ohne Budgetangabe entfällt nur die Warnung, der Rest funktioniert weiter.
       error: () => this.budget.set(null)
     });
