@@ -16,4 +16,13 @@ public interface LlmClient {
 
     /** Bezeichnung des verwendeten Modells, wird am Generierungsjob protokolliert. */
     String modelName();
+
+    /**
+     * Anfragen, die der Tarif pro Tag zulaesst. Dient der Vorwarnung, bevor ein zu
+     * grosser Lauf zur Haelfte im Kontingent stecken bleibt.
+     */
+    int dailyRequestBudget();
+
+    /** Durchsatz, mit dem verarbeitet wird - Grundlage der Dauerschaetzung im Frontend. */
+    int requestsPerMinute();
 }

@@ -194,6 +194,16 @@ h3 {
   }
 }
 
+.warning {
+  max-width: 44rem;
+  margin: 0.75rem 0 0;
+  padding: 0.6rem 0.8rem;
+  border-left: 3px solid var(--warn);
+  border-radius: 0 6px 6px 0;
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  font-size: 0.9rem;
+}
+
 .error {
   margin: 1rem 0 0;
   color: var(--down);

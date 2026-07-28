@@ -47,6 +47,13 @@ public final class GenerationDtos {
         }
     }
 
+    /**
+     * Rahmenbedingungen des Tarifs, damit das Frontend vor einem zu grossen Lauf
+     * warnen kann, statt ihn zur Haelfte im Kontingent stecken zu lassen.
+     */
+    public record GenerationBudgetResponse(String model, int dailyRequestBudget, int requestsPerMinute) {
+    }
+
     public record GenerationJobResponse(
             UUID id,
             JobStatus status,

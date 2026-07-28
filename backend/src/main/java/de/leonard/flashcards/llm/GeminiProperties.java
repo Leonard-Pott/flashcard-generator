@@ -22,6 +22,13 @@ public record GeminiProperties(
         /** Free Tier: wenige Anfragen pro Minute, modellabhaengig etwa 5-15. */
         @Min(1)
         int requestsPerMinute,
+        /**
+         * Anfragen pro Tag, die der Tarif zulaesst. Nur zur Vorwarnung im Frontend -
+         * durchgesetzt wird das Limit von Google, nicht von uns. Gemessen wird es pro
+         * Modell und Projekt, nicht pro Lauf.
+         */
+        @Min(1)
+        int dailyRequestBudget,
         @Min(0)
         int maxRetries,
         /** Wartezeit vor dem ersten neuen Versuch; danach jeweils verdoppelt. */

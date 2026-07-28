@@ -49,6 +49,12 @@ exponentiellem Backoff (2s/4s/8s/16s) bei HTTP 429, 5xx und Netzwerkfehlern.
 
 Der API-Key kommt ausschließlich aus der Umgebungsvariable `GEMINI_API_KEY`. Das Modell
 steht in `application.yml` unter `llm.gemini.model`; eingetragen ist `gemini-3.6-flash`.
+
+**Tageskontingent:** Der Free Tier erlaubt für `gemini-3.6-flash` nur **20 Anfragen pro
+Tag** — eine je Textabschnitt. Ein Dokument mit 150.000 Zeichen ergibt rund 25 Abschnitte
+und passt damit nicht in einen Tag. Der Generierungs-Dialog warnt vorher. Der hinterlegte
+Wert steht unter `llm.gemini.daily-request-budget` und lässt sich mit `GEMINI_DAILY_BUDGET`
+überschreiben, wenn du ein anderes Modell oder einen bezahlten Tarif verwendest.
 Achtung: In der Modellliste der API aufzutauchen heißt nicht, dass ein Modell nutzbar ist —
 `gemini-2.5-flash` steht dort, wird für neue Keys aber mit HTTP 404 abgelehnt.
 

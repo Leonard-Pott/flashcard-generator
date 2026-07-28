@@ -39,6 +39,22 @@ class GenerationControllerTest {
     @MockitoBean
     private GenerationRunner runner;
 
+    @MockitoBean
+    private de.leonard.flashcards.llm.LlmClient llmClient;
+
+    @Test
+    void budgetReportsTheLimitsOfTheTariff() throws Exception {
+        given(llmClient.modelName()).willReturn("gemini-3.6-flash");
+        given(llmClient.dailyRequestBudget()).willReturn(20);
+        given(llmClient.requestsPerMinute()).willReturn(10);
+
+        mockMvc.perform(get("/api/generation-jobs/budget"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.model").value("gemini-3.6-flash"))
+                .andExpect(jsonPath("$.dailyRequestBudget").value(20))
+                .andExpect(jsonPath("$.requestsPerMinute").value(10));
+    }
+
     @Test
     void createReturnsAcceptedAndStartsTheRun() throws Exception {
         UUID documentId = UUID.randomUUID();

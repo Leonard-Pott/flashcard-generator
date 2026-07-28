@@ -12,8 +12,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import de.leonard.flashcards.generation.GenerationDtos.GenerationBudgetResponse;
 import de.leonard.flashcards.generation.GenerationDtos.GenerationJobResponse;
 import de.leonard.flashcards.generation.GenerationDtos.GenerationRequest;
+import de.leonard.flashcards.llm.LlmClient;
 
 import jakarta.validation.Valid;
 
@@ -23,10 +25,19 @@ public class GenerationController {
 
     private final GenerationService service;
     private final GenerationRunner runner;
+    private final LlmClient llmClient;
 
-    public GenerationController(GenerationService service, GenerationRunner runner) {
+    public GenerationController(GenerationService service, GenerationRunner runner, LlmClient llmClient) {
         this.service = service;
         this.runner = runner;
+        this.llmClient = llmClient;
+    }
+
+    /** Muss vor /{id} stehen, sonst versucht Spring "budget" als UUID zu lesen. */
+    @GetMapping("/budget")
+    public GenerationBudgetResponse budget() {
+        return new GenerationBudgetResponse(
+                llmClient.modelName(), llmClient.dailyRequestBudget(), llmClient.requestsPerMinute());
     }
 
     /**

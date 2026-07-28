@@ -6,7 +6,7 @@ import { environment } from '../../../environments/environment';
 import { Card, CreateCardRequest, NextCard, UpdateCardRequest } from '../models/card';
 import { CreateDeckRequest, Deck, UpdateDeckRequest } from '../models/deck';
 import { DocumentSummary } from '../models/document';
-import { GenerationJob, GenerationRequest } from '../models/generation';
+import { GenerationBudget, GenerationJob, GenerationRequest } from '../models/generation';
 import { Health } from '../models/health';
 
 /**
@@ -94,5 +94,9 @@ export class ApiService {
 
   generationJob(id: string): Observable<GenerationJob> {
     return this.http.get<GenerationJob>(`${this.baseUrl}/generation-jobs/${id}`);
+  }
+
+  generationBudget(): Observable<GenerationBudget> {
+    return this.http.get<GenerationBudget>(`${this.baseUrl}/generation-jobs/budget`);
   }
 }

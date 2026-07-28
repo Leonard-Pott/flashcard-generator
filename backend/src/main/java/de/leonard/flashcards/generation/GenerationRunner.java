@@ -28,6 +28,9 @@ public class GenerationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(GenerationRunner.class);
 
+    /** So viele verschiedene Ursachen kommen in die Job-Notiz, der Rest wird gezaehlt. */
+    private static final int MAX_SHOWN_CAUSES = 2;
+
     private final GenerationJobStore store;
     private final DocumentRepository documentRepository;
     private final TextChunker chunker;
@@ -90,7 +93,7 @@ public class GenerationRunner {
                 // Genau der Fall, fuer den der Plan das Ueberspringen vorsieht.
                 log.warn("Job {}: Abschnitt {} uebersprungen: {}", jobId, chunk.index(), e.getMessage());
                 store.recordSkippedChunk(jobId);
-                problems.add("Abschnitt %d: %s".formatted(chunk.index() + 1, e.getMessage()));
+                problems.add(e.getMessage());
             }
         }
 
@@ -100,21 +103,34 @@ public class GenerationRunner {
     private void finish(UUID jobId, int totalChunks, List<String> problems) {
         if (problems.size() == totalChunks) {
             store.fail(jobId, "Kein einziger Abschnitt konnte verarbeitet werden. "
-                    + firstProblems(problems));
+                    + summarize(problems));
             return;
         }
         String note = problems.isEmpty()
                 ? null
                 : "%d von %d Abschnitten uebersprungen. %s".formatted(
-                        problems.size(), totalChunks, firstProblems(problems));
+                        problems.size(), totalChunks, summarize(problems));
         store.complete(jobId, note);
     }
 
-    /** Nur die ersten Meldungen aufnehmen; bei vielen Fehlern sind sie ohnehin gleichlautend. */
-    private String firstProblems(List<String> problems) {
-        List<String> shown = problems.size() <= 3 ? problems : problems.subList(0, 3);
+    /**
+     * Gleichlautende Ursachen zu einer Meldung zusammenfassen. Bricht ein Lauf am
+     * Kontingent ab, scheitern alle folgenden Abschnitte am selben Grund - den elfmal
+     * untereinander zu zeigen hilft niemandem.
+     */
+    private String summarize(List<String> problems) {
+        List<String> distinct = problems.stream().distinct().toList();
+
+        if (distinct.size() == 1) {
+            return distinct.getFirst();
+        }
+        List<String> shown = distinct.size() <= MAX_SHOWN_CAUSES
+                ? distinct
+                : distinct.subList(0, MAX_SHOWN_CAUSES);
         String text = String.join(" | ", shown);
-        return problems.size() > shown.size() ? text + " | … (" + problems.size() + " insgesamt)" : text;
+        return distinct.size() > shown.size()
+                ? text + " | … und %d weitere Ursachen".formatted(distinct.size() - shown.size())
+                : text;
     }
 
     private List<GeneratedCard> generateFor(Chunk chunk, String systemPrompt) {

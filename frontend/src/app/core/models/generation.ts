@@ -31,6 +31,13 @@ export interface GenerationJob {
   finishedAt: string | null;
 }
 
+/** Rahmenbedingungen des Tarifs (GET /api/generation-jobs/budget). */
+export interface GenerationBudget {
+  model: string;
+  dailyRequestBudget: number;
+  requestsPerMinute: number;
+}
+
 export function isFinished(job: GenerationJob): boolean {
   return job.status === 'COMPLETED' || job.status === 'FAILED';
 }

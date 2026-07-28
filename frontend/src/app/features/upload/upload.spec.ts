@@ -9,6 +9,8 @@ import { environment } from '../../../environments/environment';
 
 const documentsUrl = `${environment.apiBaseUrl}/documents`;
 const decksUrl = `${environment.apiBaseUrl}/decks`;
+const budgetUrl = `${environment.apiBaseUrl}/generation-jobs/budget`;
+const budget = { model: 'gemini-3.6-flash', dailyRequestBudget: 20, requestsPerMinute: 10 };
 
 function summary(overrides: Partial<DocumentSummary> = {}): DocumentSummary {
   return {
@@ -49,11 +51,16 @@ describe('UploadPage', () => {
     return (fixture.nativeElement as HTMLElement).textContent ?? '';
   }
 
-  /** Die Seite laedt beim Start Dokumente und Stapel; beides muss beantwortet werden. */
-  async function load(documents: DocumentSummary[], decks: unknown[] = []): Promise<void> {
+  /** Die Seite laedt beim Start Dokumente, Stapel und die Tarifgrenzen. */
+  async function load(
+    documents: DocumentSummary[],
+    decks: object[] = [],
+    limits: object = budget
+  ): Promise<void> {
     await fixture.whenStable();
     httpMock.expectOne(documentsUrl).flush(documents);
     httpMock.expectOne(decksUrl).flush(decks);
+    httpMock.expectOne(budgetUrl).flush(limits);
     await fixture.whenStable();
   }
 
@@ -163,6 +170,37 @@ describe('UploadPage', () => {
     // 60.000 Zeichen bei 6.000 je Abschnitt, gedrosselt auf etwa 10 pro Minute.
     expect(text()).toContain('10 Abschnitte');
     expect(text()).toContain('1 Minuten');
+    expect(text()).toContain('10 von 20 Anfragen des Tageskontingents');
+  });
+
+  it('should warn when the run needs more requests than the daily budget allows', async () => {
+    // 150.000 Zeichen ergeben rund 25 Abschnitte, das Tageskontingent liegt bei 20.
+    await load([summary({ charCount: 150000 })]);
+    await selectFirstDocument();
+
+    expect(text()).toContain('25 Anfragen');
+    expect(text()).toContain('nur 20 pro Tag');
+    expect(text()).toContain('Duplikate werden erkannt');
+  });
+
+  it('should not warn when the run fits into the daily budget', async () => {
+    await load([summary({ charCount: 30000 })]);
+    await selectFirstDocument();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('.warning')).toBeNull();
+  });
+
+  it('should stay usable when the budget cannot be loaded', async () => {
+    await fixture.whenStable();
+    httpMock.expectOne(documentsUrl).flush([summary({ charCount: 150000 })]);
+    httpMock.expectOne(decksUrl).flush([]);
+    httpMock.expectOne(budgetUrl).flush({ detail: 'weg' }, { status: 500, statusText: 'Error' });
+    await fixture.whenStable();
+    await selectFirstDocument();
+
+    // Ohne Budgetangabe entfaellt nur die Warnung; die Schaetzung bleibt.
+    expect((fixture.nativeElement as HTMLElement).querySelector('.warning')).toBeNull();
+    expect(text()).toContain('25 Abschnitte');
   });
 
   it('should start a generation job for a new deck', async () => {

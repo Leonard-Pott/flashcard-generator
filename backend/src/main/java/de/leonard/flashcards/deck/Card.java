@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 
 import jakarta.persistence.CollectionTable;
@@ -97,10 +98,16 @@ public class Card {
         touch();
     }
 
+    /**
+     * Tags werden sortiert abgelegt. Die Entitaet haelt diese Zusicherung selbst, statt
+     * sich auf jeden Aufrufer zu verlassen: Aus der Datenbank kommen sie durch
+     * {@code @OrderBy} sortiert zurueck, und eine frisch gebaute Karte soll sich genauso
+     * verhalten wie eine geladene.
+     */
     public void setTags(Set<String> tags) {
         this.tags.clear();
         if (tags != null) {
-            this.tags.addAll(tags);
+            this.tags.addAll(new TreeSet<>(tags));
         }
         touch();
     }

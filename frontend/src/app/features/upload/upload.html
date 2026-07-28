@@ -112,7 +112,14 @@
       <p class="muted">
         {{ selectedCount() }} Dokument(e) ausgewählt · geschätzt {{ estimate().chunks }} Abschnitte,
         etwa {{ estimate().minutes }} Minuten
+        @if (budget(); as budget) {
+          · {{ estimate().chunks }} von {{ budget.dailyRequestBudget }} Anfragen des Tageskontingents
+        }
       </p>
+    }
+
+    @if (budgetWarning(); as warning) {
+      <p class="warning">{{ warning }}</p>
     }
 
     <form (ngSubmit)="startGeneration()">

@@ -6,7 +6,7 @@ import { concatMap, from } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { DocumentSummary } from '../../core/models/document';
 import { Deck, Language } from '../../core/models/deck';
-import { CardStyle } from '../../core/models/generation';
+import { CardStyle, GenerationBudget } from '../../core/models/generation';
 import { apiErrorMessage } from '../../core/api-error';
 
 interface UploadEntry {
@@ -48,21 +48,54 @@ export class UploadPage {
   protected readonly selectedCount = computed(() => this.selectedIds().size);
   protected readonly canStart = computed(() => this.selectedCount() > 0 && !this.starting());
 
+  protected readonly budget = signal<GenerationBudget | null>(null);
+
   /**
-   * Grobe Schätzung: rund 6.000 Zeichen je Abschnitt, und die Drosselung lässt nur
-   * etwa 10 Anfragen pro Minute zu. Der Free Tier ist langsam — besser vorher sagen.
+   * Grobe Schätzung: rund 6.000 Zeichen je Abschnitt. Jeder Abschnitt ist eine Anfrage
+   * ans Modell — daran hängt sowohl die Dauer als auch der Verbrauch am Tageskontingent.
    */
   protected readonly estimate = computed(() => {
     const characters = this.documents()
       .filter((document) => this.selectedIds().has(document.id))
       .reduce((sum, document) => sum + document.charCount, 0);
     const chunks = Math.max(1, Math.ceil(characters / 6000));
-    return { chunks, minutes: Math.max(1, Math.ceil(chunks / 10)) };
+    const perMinute = this.budget()?.requestsPerMinute ?? 10;
+    return { chunks, minutes: Math.max(1, Math.ceil(chunks / perMinute)) };
+  });
+
+  /**
+   * Warnung, wenn der Lauf mehr Anfragen braucht als der Tarif am Tag hergibt. Ohne die
+   * Vorwarnung bleibt er mittendrin im Kontingent stecken, und die restlichen Abschnitte
+   * werden übersprungen.
+   */
+  protected readonly budgetWarning = computed(() => {
+    const budget = this.budget();
+    if (!budget || this.selectedCount() === 0) {
+      return null;
+    }
+    const { chunks } = this.estimate();
+    if (chunks <= budget.dailyRequestBudget) {
+      return null;
+    }
+    return `Der Lauf braucht etwa ${chunks} Anfragen, ${budget.model} erlaubt aber nur `
+      + `${budget.dailyRequestBudget} pro Tag. Es entstehen voraussichtlich nur Karten aus den `
+      + `ersten ${budget.dailyRequestBudget} Abschnitten, der Rest wird übersprungen. `
+      + `Tipp: weniger Dokumente auf einmal auswählen und den Rest morgen ergänzen — `
+      + `derselbe Zielstapel funktioniert, Duplikate werden erkannt.`;
   });
 
   constructor() {
     this.loadDocuments();
     this.loadDecks();
+    this.loadBudget();
+  }
+
+  private loadBudget(): void {
+    this.api.generationBudget().subscribe({
+      next: (budget) => this.budget.set(budget),
+      // Ohne Budgetangabe entfällt nur die Warnung, der Rest funktioniert weiter.
+      error: () => this.budget.set(null)
+    });
   }
 
   private loadDecks(): void {

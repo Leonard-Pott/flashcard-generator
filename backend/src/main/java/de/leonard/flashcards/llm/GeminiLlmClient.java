@@ -36,6 +36,7 @@ public class GeminiLlmClient implements LlmClient {
     private final GeminiProperties properties;
     private final Pacer pacer;
     private final Sleeper sleeper;
+    private final GeminiErrorSummarizer summarizer;
 
     public GeminiLlmClient(RestClient restClient, ObjectMapper objectMapper,
                            GeminiProperties properties, Sleeper sleeper) {
@@ -44,11 +45,22 @@ public class GeminiLlmClient implements LlmClient {
         this.properties = properties;
         this.sleeper = sleeper;
         this.pacer = new Pacer(properties.requestsPerMinute(), sleeper);
+        this.summarizer = new GeminiErrorSummarizer(objectMapper);
     }
 
     @Override
     public String modelName() {
         return properties.model();
+    }
+
+    @Override
+    public int dailyRequestBudget() {
+        return properties.dailyRequestBudget();
+    }
+
+    @Override
+    public int requestsPerMinute() {
+        return properties.requestsPerMinute();
     }
 
     @Override
@@ -65,7 +77,7 @@ public class GeminiLlmClient implements LlmClient {
                 return extractText(result.response());
             }
             if (!result.retryable() || attempt == properties.maxRetries()) {
-                throw new LlmException(result.describe(properties.maxRetries() + 1));
+                throw new LlmException(result.describe(properties.maxRetries() + 1, summarizer));
             }
 
             log.warn("Gemini antwortete mit {}, neuer Versuch in {}s ({} von {})",
@@ -78,7 +90,7 @@ public class GeminiLlmClient implements LlmClient {
         // Nicht erreichbar: die Schleife wirft im letzten Durchlauf.
         throw new LlmException(lastFailure == null
                 ? "Gemini lieferte keine Antwort."
-                : lastFailure.describe(properties.maxRetries() + 1));
+                : lastFailure.describe(properties.maxRetries() + 1, summarizer));
     }
 
     private Attempt send(Request request) {
@@ -182,15 +194,15 @@ public class GeminiLlmClient implements LlmClient {
             return networkError != null ? networkError.getClass().getSimpleName() : "HTTP " + status;
         }
 
-        String describe(int attempts) {
+        String describe(int attempts, GeminiErrorSummarizer summarizer) {
             if (networkError != null) {
                 return "Gemini war nach %d Versuchen nicht erreichbar: %s"
                         .formatted(attempts, networkError.getMessage());
             }
-            String body = errorBody == null || errorBody.isBlank() ? "(keine Fehlermeldung)" : errorBody.strip();
+            String reason = summarizer.summarize(errorBody);
             return RETRYABLE_STATUS.contains(status)
-                    ? "Gemini antwortete auch nach %d Versuchen mit HTTP %d: %s".formatted(attempts, status, body)
-                    : "Gemini antwortete mit HTTP %d: %s".formatted(status, body);
+                    ? "Gemini antwortete auch nach %d Versuchen mit HTTP %d: %s".formatted(attempts, status, reason)
+                    : "Gemini antwortete mit HTTP %d: %s".formatted(status, reason);
         }
     }
 }

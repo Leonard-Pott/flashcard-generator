@@ -120,6 +120,40 @@ class GenerationRunnerTest {
     }
 
     @Test
+    void statesTheSameCauseOnlyOnce() {
+        givenJobWithText(severalChunks());
+        // Ist das Kontingent erschoepft, scheitern alle folgenden Abschnitte gleich.
+        given(llmClient.complete(anyString(), anyString()))
+                .willReturn("[{\"front\": \"A\", \"back\": \"B\"}]")
+                .willThrow(new LlmException("Kontingent erschoepft: hoechstens 20 Anfragen pro Tag."));
+
+        runner.run(jobId);
+
+        ArgumentCaptor<String> note = ArgumentCaptor.forClass(String.class);
+        verify(store).complete(eq(jobId), note.capture());
+        String value = note.getValue();
+
+        assertThat(value).contains("Kontingent erschoepft");
+        // Die Ursache steht genau einmal drin, nicht einmal je uebersprungenem Abschnitt.
+        assertThat(value.split("Kontingent erschoepft", -1)).hasSize(2);
+    }
+
+    @Test
+    void listsDifferentCausesSeparately() {
+        givenJobWithText(severalChunks());
+        given(llmClient.complete(anyString(), anyString()))
+                .willThrow(new LlmException("Kontingent erschoepft."))
+                .willReturn("Kein JSON")
+                .willReturn("[{\"front\": \"A\", \"back\": \"B\"}]");
+
+        runner.run(jobId);
+
+        ArgumentCaptor<String> note = ArgumentCaptor.forClass(String.class);
+        verify(store).complete(eq(jobId), note.capture());
+        assertThat(note.getValue()).contains("Kontingent erschoepft").contains("JSON-Array");
+    }
+
+    @Test
     void skipsChunkWhenTheAnswerIsNotParseable() {
         givenJobWithText(oneChunk());
         given(llmClient.complete(anyString(), anyString()))

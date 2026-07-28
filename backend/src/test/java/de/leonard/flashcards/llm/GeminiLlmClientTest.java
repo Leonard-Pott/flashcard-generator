@@ -214,6 +214,7 @@ class GeminiLlmClientTest {
                 "gemini-3.6-flash",
                 wireMock.baseUrl() + "/v1beta",
                 10,
+                20,
                 4,
                 Duration.ofSeconds(2),
                 Duration.ofSeconds(5));

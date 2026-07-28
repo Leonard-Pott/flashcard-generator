@@ -42,6 +42,9 @@ llm:
     model: gemini-3.6-flash
     base-url: https://generativelanguage.googleapis.com/v1beta
     requests-per-minute: 10
+    # Tageskontingent des Free Tier fuer dieses Modell. Wird nur fuer die Vorwarnung im
+    # Frontend verwendet; durchgesetzt wird es von Google. Fuer gemini-3.6-flash sind es 20.
+    daily-request-budget: ${GEMINI_DAILY_BUDGET:20}
     max-retries: 4
     initial-backoff: 2s
     timeout: 90s
