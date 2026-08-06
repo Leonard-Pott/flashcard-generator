@@ -1,7 +1,6 @@
 package de.leonard.flashcards.deck;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.TreeSet;
@@ -61,9 +60,13 @@ public class Card {
     @Column(nullable = false)
     private int repetitions;
 
-    /** Neue Karten sind sofort faellig. */
-    @Column(name = "due_date", nullable = false)
-    private LocalDate dueDate;
+    /** Index im Lernschritt-Plan; -1 sobald die Karte im Tagesrhythmus laeuft. */
+    @Column(name = "learning_step", nullable = false)
+    private int learningStep;
+
+    /** Zeitstempel statt Datum, damit Lernschritte im Minutenabstand moeglich sind. */
+    @Column(name = "due_at", nullable = false)
+    private Instant dueAt;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -83,7 +86,9 @@ public class Card {
         this.easeFactor = INITIAL_EASE_FACTOR;
         this.intervalDays = 0;
         this.repetitions = 0;
-        this.dueDate = LocalDate.now();
+        // Neue Karten stehen auf dem ersten Lernschritt und sind sofort faellig.
+        this.learningStep = 0;
+        this.dueAt = Instant.now();
         this.createdAt = Instant.now();
         this.updatedAt = this.createdAt;
     }
@@ -119,11 +124,13 @@ public class Card {
     }
 
     /** Uebernimmt das Ergebnis einer Bewertung; gerechnet wird es im study-Paket. */
-    public void recordReview(double easeFactor, int intervalDays, int repetitions, LocalDate dueDate) {
+    public void recordReview(double easeFactor, int intervalDays, int repetitions, int learningStep,
+                             Instant dueAt) {
         this.easeFactor = easeFactor;
         this.intervalDays = intervalDays;
         this.repetitions = repetitions;
-        this.dueDate = dueDate;
+        this.learningStep = learningStep;
+        this.dueAt = dueAt;
         touch();
     }
 
@@ -171,8 +178,12 @@ public class Card {
         return repetitions;
     }
 
-    public LocalDate getDueDate() {
-        return dueDate;
+    public int getLearningStep() {
+        return learningStep;
+    }
+
+    public Instant getDueAt() {
+        return dueAt;
     }
 
     public Instant getCreatedAt() {

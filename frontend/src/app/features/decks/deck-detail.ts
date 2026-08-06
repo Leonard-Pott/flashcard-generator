@@ -4,8 +4,10 @@ import { RouterLink } from '@angular/router';
 
 import { ApiService } from '../../core/services/api.service';
 import { Card } from '../../core/models/card';
-import { Deck } from '../../core/models/deck';
+import { Deck, UpdateDeckRequest } from '../../core/models/deck';
+import { Folder } from '../../core/models/folder';
 import { apiErrorMessage } from '../../core/api-error';
+import { formatDue } from '../../core/due-time';
 
 @Component({
   selector: 'app-deck-detail',
@@ -33,6 +35,18 @@ export class DeckDetailPage {
   protected newBack = '';
   protected newTags = '';
 
+  /** Rohwert des Datumsfelds; leer heißt "kein Prüfungstermin". */
+  protected examDate = '';
+
+  protected deckName = '';
+  protected folderId = '';
+  protected readonly folders = signal<Folder[]>([]);
+
+  /** Kandidaten zum Zusammenführen: alle Stapel ausser diesem. */
+  protected readonly otherDecks = signal<Deck[]>([]);
+  protected mergeSourceId = '';
+  protected readonly merging = signal(false);
+
   constructor() {
     effect(() => this.load(this.id()));
   }
@@ -41,7 +55,7 @@ export class DeckDetailPage {
     this.loading.set(true);
     this.api.deck(deckId).subscribe({
       next: (deck) => {
-        this.deck.set(deck);
+        this.applyDeck(deck);
         this.loadCards(deckId);
       },
       error: (err: unknown) => {
@@ -49,6 +63,22 @@ export class DeckDetailPage {
         this.loading.set(false);
       }
     });
+    this.api.folders().subscribe({
+      next: (folders) => this.folders.set(folders),
+      error: (err: unknown) => this.error.set(apiErrorMessage(err))
+    });
+    this.api.decks().subscribe({
+      next: (decks) => this.otherDecks.set(decks.filter((deck) => deck.id !== deckId)),
+      error: (err: unknown) => this.error.set(apiErrorMessage(err))
+    });
+  }
+
+  /** Hält die Formularfelder am Stand des Servers. */
+  private applyDeck(deck: Deck): void {
+    this.deck.set(deck);
+    this.deckName = deck.name;
+    this.examDate = deck.examDate ?? '';
+    this.folderId = deck.folderId ?? '';
   }
 
   private loadCards(deckId: string): void {
@@ -90,6 +120,73 @@ export class DeckDetailPage {
       });
   }
 
+  /** Ein leeres Feld entfernt den Termin, statt ihn stehen zu lassen. */
+  protected saveExamDate(): void {
+    this.patchDeck({ examDate: this.examDate });
+  }
+
+  protected saveFolder(): void {
+    this.patchDeck({ folderId: this.folderId });
+  }
+
+  protected saveName(): void {
+    const name = this.deckName.trim();
+    if (name.length === 0) {
+      this.error.set('Der Name darf nicht leer sein.');
+      return;
+    }
+    if (name === this.deck()?.name) {
+      return;
+    }
+    this.patchDeck({ name });
+  }
+
+  /** Übernimmt die Karten eines anderen Stapels; dieser hier bleibt bestehen. */
+  protected mergeSelected(): void {
+    const sourceId = this.mergeSourceId;
+    if (!sourceId) {
+      return;
+    }
+
+    this.merging.set(true);
+    this.api.mergeDecks(this.id(), sourceId).subscribe({
+      next: (deck) => {
+        this.applyDeck(deck);
+        this.otherDecks.update((current) => current.filter((other) => other.id !== sourceId));
+        this.mergeSourceId = '';
+        this.merging.set(false);
+        this.error.set(null);
+        this.loadCards(this.id());
+      },
+      error: (err: unknown) => {
+        this.error.set(apiErrorMessage(err));
+        this.merging.set(false);
+      }
+    });
+  }
+
+  private patchDeck(request: UpdateDeckRequest): void {
+    this.api.updateDeck(this.id(), request).subscribe({
+      next: (deck) => {
+        this.applyDeck(deck);
+        this.error.set(null);
+      },
+      error: (err: unknown) => this.error.set(apiErrorMessage(err))
+    });
+  }
+
+  /** Tage bis zur Prüfung; negativ, wenn sie vorbei ist. */
+  protected daysUntilExam(examDate: string): number {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    return Math.round((new Date(examDate).getTime() - start.getTime()) / 86_400_000);
+  }
+
+  /** Spiegelt den Deckel aus Sm2.capBeforeExam: halbe Restzeit, mindestens ein Tag. */
+  protected examCap(examDate: string): number {
+    return Math.max(1, Math.floor(this.daysUntilExam(examDate) / 2));
+  }
+
   protected startEdit(card: Card): void {
     this.editingId.set(card.id);
     this.editFront = card.front;
@@ -122,7 +219,9 @@ export class DeckDetailPage {
     this.api.deleteCard(card.id).subscribe({
       next: () => {
         this.cards.update((current) => current.filter((c) => c.id !== card.id));
-        this.bumpCardCount(-1);
+        // Nur mitzählen, was heute überhaupt noch angestanden hätte.
+        const dueToday = new Date(card.dueAt).getTime() < new Date().setHours(24, 0, 0, 0);
+        this.bumpCardCount(-1, dueToday ? -1 : 0);
         if (this.editingId() === card.id) {
           this.editingId.set(null);
         }
@@ -131,9 +230,16 @@ export class DeckDetailPage {
     });
   }
 
-  private bumpCardCount(delta: number): void {
+  /** {@code dueDelta} weicht ab, wenn die Karte gar nicht für heute anstand. */
+  private bumpCardCount(delta: number, dueDelta = delta): void {
     this.deck.update((current) =>
-      current ? { ...current, cardCount: current.cardCount + delta } : current
+      current
+        ? {
+            ...current,
+            cardCount: current.cardCount + delta,
+            dueToday: current.dueToday + dueDelta
+          }
+        : current
     );
   }
 
@@ -147,6 +253,8 @@ export class DeckDetailPage {
   protected exportUrl(format: 'csv' | 'anki'): string {
     return this.api.exportUrl(this.id(), format);
   }
+
+  protected readonly formatDue = formatDue;
 
   protected formatDate(iso: string): string {
     return new Intl.DateTimeFormat('de-DE', { dateStyle: 'short' }).format(new Date(iso));

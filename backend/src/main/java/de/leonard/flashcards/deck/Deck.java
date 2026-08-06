@@ -1,6 +1,7 @@
 package de.leonard.flashcards.deck;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -26,6 +27,17 @@ public class Deck {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 8)
     private Language language;
+
+    /** Optional. Ist es gesetzt, deckelt der Scheduler die Intervalle auf die Restzeit. */
+    @Column(name = "exam_date")
+    private LocalDate examDate;
+
+    /**
+     * Optionale Gruppierung. Bewusst nur die Id statt einer Beziehung - der Stapel
+     * braucht vom Ordner nichts ausser der Zugehoerigkeit.
+     */
+    @Column(name = "folder_id")
+    private UUID folderId;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -61,6 +73,18 @@ public class Deck {
         touch();
     }
 
+    /** {@code null} schaltet den Deckel wieder ab. */
+    public void examOn(LocalDate examDate) {
+        this.examDate = examDate;
+        touch();
+    }
+
+    /** {@code null} nimmt den Stapel aus seinem Ordner heraus. */
+    public void moveTo(UUID folderId) {
+        this.folderId = folderId;
+        touch();
+    }
+
     private void touch() {
         this.updatedAt = Instant.now();
     }
@@ -79,6 +103,14 @@ public class Deck {
 
     public Language getLanguage() {
         return language;
+    }
+
+    public LocalDate getExamDate() {
+        return examDate;
+    }
+
+    public UUID getFolderId() {
+        return folderId;
     }
 
     public Instant getCreatedAt() {

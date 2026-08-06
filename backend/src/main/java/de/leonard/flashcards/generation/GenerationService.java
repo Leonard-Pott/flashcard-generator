@@ -99,7 +99,7 @@ public class GenerationService {
         }
 
         Deck deck = deckService.create(new CreateDeckRequest(
-                request.newDeckName(), null, request.languageOrDefault()));
+                request.newDeckName(), null, request.languageOrDefault(), null));
         return deck.getId();
     }
 }

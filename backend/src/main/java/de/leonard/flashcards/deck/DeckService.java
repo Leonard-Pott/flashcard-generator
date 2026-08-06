@@ -1,5 +1,9 @@
 package de.leonard.flashcards.deck;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.UUID;
 
@@ -19,10 +23,15 @@ public class DeckService {
 
     private final DeckRepository deckRepository;
     private final CardRepository cardRepository;
+    private final FolderRepository folderRepository;
+    private final Clock clock;
 
-    public DeckService(DeckRepository deckRepository, CardRepository cardRepository) {
+    public DeckService(DeckRepository deckRepository, CardRepository cardRepository,
+                       FolderRepository folderRepository, Clock clock) {
         this.deckRepository = deckRepository;
         this.cardRepository = cardRepository;
+        this.folderRepository = folderRepository;
+        this.clock = clock;
     }
 
     @Transactional
@@ -31,17 +40,26 @@ public class DeckService {
                 request.name().trim(),
                 emptyToNull(request.description()),
                 request.language() != null ? request.language() : DEFAULT_LANGUAGE);
+        if (request.folderId() != null) {
+            deck.moveTo(requireFolder(request.folderId()));
+        }
         return deckRepository.save(deck);
     }
 
     @Transactional(readOnly = true)
     public List<DeckWithCardCount> findAll() {
-        return deckRepository.findAllWithCardCount();
+        return deckRepository.findAllWithCardCount(clock.instant(), endOfDay());
     }
 
     @Transactional(readOnly = true)
     public DeckWithCardCount findWithCardCount(UUID id) {
-        return deckRepository.findWithCardCount(id).orElseThrow(() -> new DeckNotFoundException(id));
+        return deckRepository.findWithCardCount(id, clock.instant(), endOfDay())
+                .orElseThrow(() -> new DeckNotFoundException(id));
+    }
+
+    /** Beginn des Folgetages: alles davor ist heute noch zu lernen. */
+    private Instant endOfDay() {
+        return LocalDate.now(clock).plusDays(1).atStartOfDay(clock.getZone()).toInstant();
     }
 
     @Transactional(readOnly = true)
@@ -66,7 +84,63 @@ public class DeckService {
         if (request.language() != null) {
             deck.useLanguage(request.language());
         }
+        if (request.examDate() != null) {
+            deck.examOn(parseExamDate(request.examDate()));
+        }
+        if (request.folderId() != null) {
+            deck.moveTo(requireFolder(parseFolderId(request.folderId())));
+        }
         return deck;
+    }
+
+    /**
+     * Haengt alle Karten des Quellstapels an den Zielstapel um und loescht den leeren
+     * Rest. Die Lernstaende der Karten bleiben unangetastet.
+     */
+    @Transactional
+    public Deck merge(UUID targetId, UUID sourceId) {
+        if (targetId.equals(sourceId)) {
+            throw new InvalidDeckException("Ein Stapel kann nicht mit sich selbst zusammengefuehrt werden.");
+        }
+        Deck target = findById(targetId);
+        // Wirft 404, wenn es den Quellstapel nicht gibt.
+        findById(sourceId);
+
+        cardRepository.moveAllToDeck(sourceId, target);
+        deckRepository.deleteById(sourceId);
+        return target;
+    }
+
+    /** Leerer String entfernt den Termin. */
+    private LocalDate parseExamDate(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(value.trim());
+        } catch (DateTimeParseException e) {
+            throw new InvalidDeckException("Kein gueltiges Datum: " + value);
+        }
+    }
+
+    /** Leerer String nimmt den Stapel aus seinem Ordner heraus. */
+    private UUID parseFolderId(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value.trim());
+        } catch (IllegalArgumentException e) {
+            throw new InvalidDeckException("Keine gueltige Ordner-Id: " + value);
+        }
+    }
+
+    /** Null bleibt null - ein Stapel muss in keinem Ordner liegen. */
+    private UUID requireFolder(UUID folderId) {
+        if (folderId != null && !folderRepository.existsById(folderId)) {
+            throw new FolderNotFoundException(folderId);
+        }
+        return folderId;
     }
 
     /** Loescht den Stapel samt Karten (ON DELETE CASCADE in V3). */
@@ -76,11 +150,6 @@ public class DeckService {
             throw new DeckNotFoundException(id);
         }
         deckRepository.deleteById(id);
-    }
-
-    @Transactional(readOnly = true)
-    public long countCards(UUID deckId) {
-        return cardRepository.countByDeckId(deckId);
     }
 
     private String emptyToNull(String value) {

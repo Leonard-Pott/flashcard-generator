@@ -4,6 +4,7 @@ import java.util.stream.Collectors;
 
 import de.leonard.flashcards.deck.CardNotFoundException;
 import de.leonard.flashcards.deck.DeckNotFoundException;
+import de.leonard.flashcards.deck.FolderNotFoundException;
 import de.leonard.flashcards.deck.InvalidDeckException;
 import de.leonard.flashcards.document.DocumentNotFoundException;
 import de.leonard.flashcards.document.InvalidUploadException;
@@ -35,6 +36,7 @@ public class ApiExceptionHandler {
             DocumentNotFoundException.class,
             DeckNotFoundException.class,
             CardNotFoundException.class,
+            FolderNotFoundException.class,
             GenerationJobNotFoundException.class
     })
     public ProblemDetail handleNotFound(RuntimeException e) {

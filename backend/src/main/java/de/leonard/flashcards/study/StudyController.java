@@ -29,7 +29,7 @@ public class StudyController {
         return NextCardResponse.of(
                 next.card() == null ? null : CardResponse.from(next.card()),
                 next.dueCount(),
-                next.nextDueDate());
+                next.nextDueAt());
     }
 
     @PostMapping("/api/cards/{cardId}/review")

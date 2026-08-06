@@ -2,7 +2,10 @@ package de.leonard.flashcards.study;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,15 +24,16 @@ import de.leonard.flashcards.deck.DeckRepository;
 import de.leonard.flashcards.deck.Language;
 
 /**
- * Prueft die Faelligkeitsabfragen gegen ein echtes Postgres - Datumsvergleiche sind
- * genau die Stelle, an der ein Mock zu wenig aussagt. Benoetigt ein laufendes Docker.
+ * Prueft die Faelligkeitsabfragen gegen ein echtes Postgres - Zeitvergleiche sind genau
+ * die Stelle, an der ein Mock zu wenig aussagt. Benoetigt ein laufendes Docker.
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers
 class StudyPersistenceTest {
 
-    private static final LocalDate TODAY = LocalDate.of(2026, 7, 27);
+    private static final ZoneId ZONE = ZoneId.of("Europe/Berlin");
+    private static final Instant NOW = LocalDate.of(2026, 7, 27).atTime(21, 30).atZone(ZONE).toInstant();
 
     @Container
     @ServiceConnection
@@ -52,43 +56,59 @@ class StudyPersistenceTest {
 
     @Test
     void findsTheOldestDueCardFirst() {
-        cardWithDueDate("Uebermorgen faellig", TODAY.plusDays(2));
-        cardWithDueDate("Gestern faellig", TODAY.minusDays(1));
-        cardWithDueDate("Heute faellig", TODAY);
+        cardDueAt("Uebermorgen faellig", NOW.plus(Duration.ofDays(2)));
+        cardDueAt("Gestern faellig", NOW.minus(Duration.ofDays(1)));
+        cardDueAt("Jetzt faellig", NOW);
 
         Card next = cardRepository
-                .findFirstByDeckIdAndDueDateLessThanEqualOrderByDueDateAscCreatedAtAsc(deck.getId(), TODAY)
+                .findFirstByDeckIdAndDueAtLessThanEqualOrderByDueAtAscCreatedAtAsc(deck.getId(), NOW)
                 .orElseThrow();
 
         assertThat(next.getFront()).isEqualTo("Gestern faellig");
     }
 
     @Test
-    void countsOnlyCardsDueTodayOrEarlier() {
-        cardWithDueDate("Gestern", TODAY.minusDays(1));
-        cardWithDueDate("Heute", TODAY);
-        cardWithDueDate("Morgen", TODAY.plusDays(1));
+    void countsOnlyCardsDueNowOrEarlier() {
+        cardDueAt("Gestern", NOW.minus(Duration.ofDays(1)));
+        cardDueAt("Jetzt", NOW);
+        cardDueAt("Morgen", NOW.plus(Duration.ofDays(1)));
 
-        assertThat(cardRepository.countByDeckIdAndDueDateLessThanEqual(deck.getId(), TODAY)).isEqualTo(2);
+        assertThat(cardRepository.countByDeckIdAndDueAtLessThanEqual(deck.getId(), NOW)).isEqualTo(2);
+    }
+
+    /** Der Kern des Ganzen: ein Lernschritt liegt Minuten entfernt, nicht Tage. */
+    @Test
+    void separatesCardsThatAreMinutesApart() {
+        cardDueAt("In einer Minute", NOW.plus(Duration.ofMinutes(1)));
+        cardDueAt("In zehn Minuten", NOW.plus(Duration.ofMinutes(10)));
+
+        assertThat(cardRepository.countByDeckIdAndDueAtLessThanEqual(deck.getId(), NOW)).isZero();
+
+        Instant later = NOW.plus(Duration.ofMinutes(5));
+        assertThat(cardRepository.countByDeckIdAndDueAtLessThanEqual(deck.getId(), later)).isEqualTo(1);
+        assertThat(cardRepository
+                .findFirstByDeckIdAndDueAtGreaterThanOrderByDueAtAsc(deck.getId(), later)
+                .orElseThrow()
+                .getFront()).isEqualTo("In zehn Minuten");
     }
 
     @Test
     void findsTheNextFutureDueDate() {
-        cardWithDueDate("In zehn Tagen", TODAY.plusDays(10));
-        cardWithDueDate("In drei Tagen", TODAY.plusDays(3));
+        cardDueAt("In zehn Tagen", NOW.plus(Duration.ofDays(10)));
+        cardDueAt("In drei Tagen", NOW.plus(Duration.ofDays(3)));
 
         Card next = cardRepository
-                .findFirstByDeckIdAndDueDateGreaterThanOrderByDueDateAsc(deck.getId(), TODAY)
+                .findFirstByDeckIdAndDueAtGreaterThanOrderByDueAtAsc(deck.getId(), NOW)
                 .orElseThrow();
 
-        assertThat(next.getDueDate()).isEqualTo(TODAY.plusDays(3));
+        assertThat(next.getDueAt()).isEqualTo(NOW.plus(Duration.ofDays(3)));
     }
 
     @Test
     void newCardsAreDueImmediately() {
         cardRepository.saveAndFlush(new Card(deck, "Neue Karte", "Antwort"));
 
-        assertThat(cardRepository.countByDeckIdAndDueDateLessThanEqual(deck.getId(), LocalDate.now()))
+        assertThat(cardRepository.countByDeckIdAndDueAtLessThanEqual(deck.getId(), Instant.now()))
                 .isEqualTo(1);
     }
 
@@ -96,18 +116,19 @@ class StudyPersistenceTest {
     void doesNotLookIntoOtherDecks() {
         Deck other = deckRepository.save(new Deck("Anderer Stapel", null, Language.DE));
         Card foreign = new Card(other, "Fremde Karte", "Antwort");
-        foreign.recordReview(2.5, 0, 0, TODAY.minusDays(1));
+        foreign.recordReview(2.5, 0, 0, 0, NOW.minus(Duration.ofDays(1)));
         cardRepository.saveAndFlush(foreign);
 
         assertThat(cardRepository
-                .findFirstByDeckIdAndDueDateLessThanEqualOrderByDueDateAscCreatedAtAsc(deck.getId(), TODAY))
+                .findFirstByDeckIdAndDueAtLessThanEqualOrderByDueAtAscCreatedAtAsc(deck.getId(), NOW))
                 .isEmpty();
     }
 
     @Test
     void storesTheReviewResult() {
         Card card = cardRepository.saveAndFlush(new Card(deck, "Frage", "Antwort"));
-        card.recordReview(2.36, 15, 3, TODAY.plusDays(15));
+        Instant due = NOW.plus(Duration.ofDays(15));
+        card.recordReview(2.36, 15, 3, Sm2.GRADUATED, due);
         cardRepository.saveAndFlush(card);
 
         Card reloaded = cardRepository.findById(card.getId()).orElseThrow();
@@ -115,12 +136,13 @@ class StudyPersistenceTest {
         assertThat(reloaded.getEaseFactor()).isEqualTo(2.36);
         assertThat(reloaded.getIntervalDays()).isEqualTo(15);
         assertThat(reloaded.getRepetitions()).isEqualTo(3);
-        assertThat(reloaded.getDueDate()).isEqualTo(TODAY.plusDays(15));
+        assertThat(reloaded.getLearningStep()).isEqualTo(Sm2.GRADUATED);
+        assertThat(reloaded.getDueAt()).isEqualTo(due);
     }
 
-    private void cardWithDueDate(String front, LocalDate dueDate) {
+    private void cardDueAt(String front, Instant dueAt) {
         Card card = new Card(deck, front, "Antwort");
-        card.recordReview(Card.INITIAL_EASE_FACTOR, 0, 0, dueDate);
+        card.recordReview(Card.INITIAL_EASE_FACTOR, 0, 0, 0, dueAt);
         cardRepository.saveAndFlush(card);
     }
 }

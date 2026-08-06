@@ -52,7 +52,7 @@ class CardControllerTest {
                 .andExpect(jsonPath("$[0].deckId").value(DECK.getId().toString()))
                 .andExpect(jsonPath("$[0].tags[0]").value("ITIL"))
                 .andExpect(jsonPath("$[0].easeFactor").value(2.5))
-                .andExpect(jsonPath("$[0].dueDate").exists());
+                .andExpect(jsonPath("$[0].dueAt").exists());
     }
 
     @Test

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import de.leonard.flashcards.deck.DeckDtos.CreateDeckRequest;
 import de.leonard.flashcards.deck.DeckDtos.DeckResponse;
+import de.leonard.flashcards.deck.DeckDtos.MergeDecksRequest;
 import de.leonard.flashcards.deck.DeckDtos.UpdateDeckRequest;
 
 import jakarta.validation.Valid;
@@ -40,7 +41,7 @@ public class DeckController {
         Deck deck = service.create(request);
         return ResponseEntity
                 .created(URI.create("/api/decks/" + deck.getId()))
-                .body(DeckResponse.from(deck, 0));
+                .body(DeckResponse.ofNew(deck));
     }
 
     @GetMapping("/{id}")
@@ -50,8 +51,15 @@ public class DeckController {
 
     @PatchMapping("/{id}")
     public DeckResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateDeckRequest request) {
-        Deck deck = service.update(id, request);
-        return DeckResponse.from(deck, service.countCards(id));
+        service.update(id, request);
+        return DeckResponse.from(service.findWithCardCount(id));
+    }
+
+    /** Uebernimmt die Karten eines anderen Stapels; der gibt es danach nicht mehr. */
+    @PostMapping("/{id}/merge")
+    public DeckResponse merge(@PathVariable UUID id, @Valid @RequestBody MergeDecksRequest request) {
+        service.merge(id, request.sourceDeckId());
+        return DeckResponse.from(service.findWithCardCount(id));
     }
 
     @DeleteMapping("/{id}")

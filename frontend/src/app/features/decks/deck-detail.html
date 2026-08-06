@@ -5,6 +5,10 @@
   <p class="meta">
     <span class="badge">{{ deck.language }}</span>
     <span>{{ deck.cardCount }} Karten</span>
+    <span>{{ deck.dueToday }} heute offen</span>
+    @if (deck.nextDueAt; as next) {
+      <span>nächste Karte {{ formatDue(next) }}</span>
+    }
     @if (deck.description) {
       <span>{{ deck.description }}</span>
     }
@@ -15,6 +19,61 @@
         <a [href]="exportUrl('csv')" download>CSV</a>
         <a [href]="exportUrl('anki')" download>Anki</a>
       </span>
+    }
+  </p>
+
+  <p class="rename">
+    <label>
+      Name
+      <input name="deckName" [(ngModel)]="deckName" (change)="saveName()" />
+    </label>
+    <label>
+      Ordner
+      <select name="folder" [(ngModel)]="folderId" (change)="saveFolder()">
+        <option value="">ohne Ordner</option>
+        @for (folder of folders(); track folder.id) {
+          <option [value]="folder.id">{{ folder.name }}</option>
+        }
+      </select>
+    </label>
+  </p>
+
+  @if (otherDecks().length > 0) {
+    <p class="merge">
+      <label>
+        Stapel übernehmen
+        <select name="mergeSource" [(ngModel)]="mergeSourceId">
+          <option value="">auswählen …</option>
+          @for (other of otherDecks(); track other.id) {
+            <option [value]="other.id">{{ other.name }} ({{ other.cardCount }} Karten)</option>
+          }
+        </select>
+      </label>
+      <button type="button" [disabled]="!mergeSourceId || merging()" (click)="mergeSelected()">
+        Zusammenführen
+      </button>
+      <span class="muted">
+        Die Karten wandern mit ihrem Lernstand hierher, der andere Stapel wird gelöscht.
+      </span>
+    </p>
+  }
+
+  <p class="exam">
+    <label>
+      Prüfung am
+      <input type="date" name="examDate" [(ngModel)]="examDate" (change)="saveExamDate()" />
+    </label>
+    @if (deck.examDate; as exam) {
+      @if (daysUntilExam(exam) > 0) {
+        <span class="muted">
+          Noch {{ daysUntilExam(exam) }} Tage — Intervalle werden auf
+          {{ examCap(exam) }} Tag(e) gedeckelt, damit jede Karte vorher wiederkommt.
+        </span>
+      } @else {
+        <span class="muted">Termin vorbei — der Stapel läuft wieder nach normalem SM-2.</span>
+      }
+    } @else {
+      <span class="muted">Ohne Termin plant SM-2 auf dauerhaftes Behalten.</span>
     }
   </p>
 }
@@ -61,7 +120,7 @@
             <td><textarea name="editFront" rows="3" [(ngModel)]="editFront"></textarea></td>
             <td><textarea name="editBack" rows="3" [(ngModel)]="editBack"></textarea></td>
             <td><input name="editTags" [(ngModel)]="editTags" placeholder="kommagetrennt" /></td>
-            <td>{{ formatDate(card.dueDate) }}</td>
+            <td>{{ formatDate(card.dueAt) }}</td>
             <td class="actions">
               <button type="button" (click)="saveEdit(card)">Speichern</button>
               <button type="button" (click)="cancelEdit()">Abbrechen</button>
@@ -81,7 +140,7 @@
                 <span class="badge">{{ tag }}</span>
               }
             </td>
-            <td>{{ formatDate(card.dueDate) }}</td>
+            <td>{{ formatDate(card.dueAt) }}</td>
             <td class="actions">
               <button type="button" (click)="startEdit(card)">Bearbeiten</button>
               <button type="button" class="danger" (click)="deleteCard(card)">Löschen</button>

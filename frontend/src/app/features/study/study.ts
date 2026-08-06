@@ -1,10 +1,20 @@
-import { Component, HostListener, computed, effect, inject, input, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  HostListener,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { ApiService } from '../../core/services/api.service';
 import { Card } from '../../core/models/card';
 import { Deck } from '../../core/models/deck';
 import { apiErrorMessage } from '../../core/api-error';
+import { formatDue } from '../../core/due-time';
 
 /**
  * Die vier Knöpfe des Lernmodus. SM-2 rechnet mit 0 bis 5; die Zwischenstufen 1 und 2
@@ -23,6 +33,12 @@ const RATINGS: Rating[] = [
   { quality: 5, label: 'Einfach', key: '4' }
 ];
 
+/**
+ * Liegt die nächste Karte näher als das, warten wir auf sie, statt "geschafft" zu melden.
+ * Deckt die Lernschritte (1 und 10 Minuten) mit Luft nach oben ab.
+ */
+const AUTO_RELOAD_WINDOW_MS = 15 * 60_000;
+
 @Component({
   selector: 'app-study',
   imports: [RouterLink],
@@ -39,7 +55,7 @@ export class StudyPage {
   protected readonly deck = signal<Deck | null>(null);
   protected readonly card = signal<Card | null>(null);
   protected readonly dueCount = signal(0);
-  protected readonly nextDueDate = signal<string | null>(null);
+  protected readonly nextDueAt = signal<string | null>(null);
   protected readonly revealed = signal(false);
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
@@ -48,7 +64,12 @@ export class StudyPage {
 
   protected readonly done = computed(() => !this.loading() && this.card() === null);
 
+  /** Wartet auf die nächste Karte aus den Lernschritten. */
+  private reloadTimer?: ReturnType<typeof setTimeout>;
+
   constructor() {
+    inject(DestroyRef).onDestroy(() => clearTimeout(this.reloadTimer));
+
     effect(() => {
       const deckId = this.id();
       this.loadDeck(deckId);
@@ -66,19 +87,40 @@ export class StudyPage {
   private loadNext(deckId: string): void {
     this.loading.set(true);
     this.revealed.set(false);
+    clearTimeout(this.reloadTimer);
+
     this.api.nextCard(deckId).subscribe({
       next: (next) => {
         this.card.set(next.card);
         this.dueCount.set(next.dueCount);
-        this.nextDueDate.set(next.nextDueDate);
+        this.nextDueAt.set(next.nextDueAt);
         this.error.set(null);
         this.loading.set(false);
+
+        if (!next.card) {
+          this.waitForNext(deckId, next.nextDueAt);
+        }
       },
       error: (err: unknown) => {
         this.error.set(apiErrorMessage(err));
         this.loading.set(false);
       }
     });
+  }
+
+  /**
+   * Karten in den Lernschritten kommen in Minuten wieder. Die holen wir selbst nach,
+   * sonst müsste der Lernende die Seite von Hand neu laden.
+   */
+  private waitForNext(deckId: string, dueAt: string | null): void {
+    if (!dueAt) {
+      return;
+    }
+
+    const delay = new Date(dueAt).getTime() - Date.now();
+    if (delay < AUTO_RELOAD_WINDOW_MS) {
+      this.reloadTimer = setTimeout(() => this.loadNext(deckId), Math.max(delay, 1000));
+    }
   }
 
   protected reveal(): void {
@@ -129,7 +171,5 @@ export class StudyPage {
     }
   }
 
-  protected formatDate(iso: string): string {
-    return new Intl.DateTimeFormat('de-DE', { dateStyle: 'long' }).format(new Date(iso));
-  }
+  protected readonly formatDue = formatDue;
 }

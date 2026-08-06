@@ -6,6 +6,7 @@ import { environment } from '../../../environments/environment';
 import { Card, CreateCardRequest, NextCard, UpdateCardRequest } from '../models/card';
 import { CreateDeckRequest, Deck, UpdateDeckRequest } from '../models/deck';
 import { DocumentSummary } from '../models/document';
+import { Folder } from '../models/folder';
 import { GenerationBudget, GenerationJob, GenerationRequest } from '../models/generation';
 import { Health } from '../models/health';
 
@@ -54,6 +55,28 @@ export class ApiService {
 
   deleteDeck(id: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/decks/${id}`);
+  }
+
+  /** Holt die Karten des Quellstapels herüber; den Quellstapel gibt es danach nicht mehr. */
+  mergeDecks(targetId: string, sourceDeckId: string): Observable<Deck> {
+    return this.http.post<Deck>(`${this.baseUrl}/decks/${targetId}/merge`, { sourceDeckId });
+  }
+
+  folders(): Observable<Folder[]> {
+    return this.http.get<Folder[]>(`${this.baseUrl}/folders`);
+  }
+
+  createFolder(name: string): Observable<Folder> {
+    return this.http.post<Folder>(`${this.baseUrl}/folders`, { name });
+  }
+
+  renameFolder(id: string, name: string): Observable<Folder> {
+    return this.http.patch<Folder>(`${this.baseUrl}/folders/${id}`, { name });
+  }
+
+  /** Die enthaltenen Stapel bleiben bestehen und liegen danach ohne Ordner. */
+  deleteFolder(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/folders/${id}`);
   }
 
   cards(deckId: string): Observable<Card[]> {

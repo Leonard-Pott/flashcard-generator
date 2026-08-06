@@ -51,12 +51,12 @@
     </div>
   }
 } @else {
-  <p class="done">Für heute geschafft.</p>
+  <p class="done">Für den Moment geschafft.</p>
   @if (reviewedCount() > 0) {
     <p class="muted">{{ reviewedCount() }} Karte(n) in dieser Sitzung bearbeitet.</p>
   }
-  @if (nextDueDate(); as next) {
-    <p class="muted">Die nächste Karte ist am {{ formatDate(next) }} fällig.</p>
+  @if (nextDueAt(); as next) {
+    <p class="muted">Die nächste Karte ist {{ formatDue(next) }} fällig.</p>
   } @else {
     <p class="muted">Dieser Stapel enthält noch keine Karten.</p>
   }

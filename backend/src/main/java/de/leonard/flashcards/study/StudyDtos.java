@@ -1,6 +1,6 @@
 package de.leonard.flashcards.study;
 
-import java.time.LocalDate;
+import java.time.Instant;
 
 import de.leonard.flashcards.deck.CardDtos.CardResponse;
 
@@ -21,13 +21,14 @@ public final class StudyDtos {
     }
 
     /**
-     * Naechste faellige Karte samt Kontext. {@code card} ist null, wenn fuer heute
-     * nichts mehr ansteht - dann sagt {@code nextDueDate}, wann es weitergeht.
+     * Naechste faellige Karte samt Kontext. {@code card} ist null, wenn gerade nichts
+     * ansteht - dann sagt {@code nextDueAt}, wann es weitergeht. Das kann wenige Minuten
+     * spaeter sein, wenn noch Karten in den Lernschritten haengen.
      */
-    public record NextCardResponse(CardResponse card, long dueCount, LocalDate nextDueDate) {
+    public record NextCardResponse(CardResponse card, long dueCount, Instant nextDueAt) {
 
-        public static NextCardResponse of(CardResponse card, long dueCount, LocalDate nextDueDate) {
-            return new NextCardResponse(card, dueCount, nextDueDate);
+        public static NextCardResponse of(CardResponse card, long dueCount, Instant nextDueAt) {
+            return new NextCardResponse(card, dueCount, nextDueAt);
         }
     }
 }

@@ -8,7 +8,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-import java.time.LocalDate;
+import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -50,8 +50,9 @@ class CardServiceTest {
         assertThat(card.getEaseFactor()).isEqualTo(2.5);
         assertThat(card.getIntervalDays()).isZero();
         assertThat(card.getRepetitions()).isZero();
-        // Neue Karten sind sofort lernbar.
-        assertThat(card.getDueDate()).isEqualTo(LocalDate.now());
+        // Neue Karten stehen auf dem ersten Lernschritt und sind sofort lernbar.
+        assertThat(card.getLearningStep()).isZero();
+        assertThat(card.getDueAt()).isBeforeOrEqualTo(Instant.now());
     }
 
     @Test

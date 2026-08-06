@@ -1,7 +1,6 @@
 package de.leonard.flashcards.deck;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -42,7 +41,8 @@ public final class CardDtos {
             double easeFactor,
             int intervalDays,
             int repetitions,
-            LocalDate dueDate,
+            int learningStep,
+            Instant dueAt,
             Instant createdAt,
             Instant updatedAt) {
 
@@ -58,7 +58,8 @@ public final class CardDtos {
                     card.getEaseFactor(),
                     card.getIntervalDays(),
                     card.getRepetitions(),
-                    card.getDueDate(),
+                    card.getLearningStep(),
+                    card.getDueAt(),
                     card.getCreatedAt(),
                     card.getUpdatedAt());
         }

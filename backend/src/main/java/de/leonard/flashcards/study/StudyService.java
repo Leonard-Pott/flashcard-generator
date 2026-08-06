@@ -1,7 +1,7 @@
 package de.leonard.flashcards.study;
 
 import java.time.Clock;
-import java.time.LocalDate;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -35,19 +35,19 @@ public class StudyService {
     public NextCard nextDue(UUID deckId) {
         // Wirft 404, wenn es den Stapel nicht gibt.
         deckService.findById(deckId);
-        LocalDate today = LocalDate.now(clock);
+        Instant now = clock.instant();
 
         Optional<Card> due = cardRepository
-                .findFirstByDeckIdAndDueDateLessThanEqualOrderByDueDateAscCreatedAtAsc(deckId, today);
-        long dueCount = cardRepository.countByDeckIdAndDueDateLessThanEqual(deckId, today);
+                .findFirstByDeckIdAndDueAtLessThanEqualOrderByDueAtAscCreatedAtAsc(deckId, now);
+        long dueCount = cardRepository.countByDeckIdAndDueAtLessThanEqual(deckId, now);
 
-        LocalDate nextDueDate = due.isPresent()
+        Instant nextDueAt = due.isPresent()
                 ? null
-                : cardRepository.findFirstByDeckIdAndDueDateGreaterThanOrderByDueDateAsc(deckId, today)
-                        .map(Card::getDueDate)
+                : cardRepository.findFirstByDeckIdAndDueAtGreaterThanOrderByDueAtAsc(deckId, now)
+                        .map(Card::getDueAt)
                         .orElse(null);
 
-        return new NextCard(due.orElse(null), dueCount, nextDueDate);
+        return new NextCard(due.orElse(null), dueCount, nextDueAt);
     }
 
     @Transactional
@@ -55,17 +55,18 @@ public class StudyService {
         Card card = cardService.findById(cardId);
 
         Sm2.ReviewOutcome outcome = sm2.apply(
-                card.getEaseFactor(),
-                card.getIntervalDays(),
-                card.getRepetitions(),
+                new Sm2.State(card.getEaseFactor(), card.getIntervalDays(), card.getRepetitions(),
+                        card.getLearningStep()),
                 quality,
-                LocalDate.now(clock));
+                clock.instant(),
+                clock.getZone(),
+                card.getDeck().getExamDate());
 
-        card.recordReview(
-                outcome.easeFactor(), outcome.intervalDays(), outcome.repetitions(), outcome.dueDate());
+        card.recordReview(outcome.easeFactor(), outcome.intervalDays(), outcome.repetitions(),
+                outcome.learningStep(), outcome.dueAt());
         return card;
     }
 
-    public record NextCard(Card card, long dueCount, LocalDate nextDueDate) {
+    public record NextCard(Card card, long dueCount, Instant nextDueAt) {
     }
 }

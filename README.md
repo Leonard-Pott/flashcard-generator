@@ -41,7 +41,8 @@ DELETE /api/cards/{id}
 ```
 
 Neue Karten starten mit den SM-2-Werten aus dem Plan (`easeFactor` 2.5, `intervalDays` 0,
-`repetitions` 0) und sind sofort fällig. Ausgewertet werden diese Felder erst in M6.
+`repetitions` 0), stehen auf dem ersten Lernschritt (`learningStep` 0) und sind sofort
+fällig. Ausgewertet werden diese Felder erst in M6.
 
 **M4 — Gemini-Anbindung**: `LlmClient`-Interface mit `GeminiLlmClient` als einziger
 Implementierung, inklusive Drosselung auf `requests-per-minute` und Wiederholung mit
@@ -102,8 +103,24 @@ POST /api/cards/{id}/review       Body: { "quality": 0..5 }
 ```
 
 Die vier Knöpfe des Lernmodus bilden auf SM-2-Bewertungen ab: Nochmal = 0, Schwer = 3,
-Gut = 4, Einfach = 5. Leertaste deckt auf, die Tasten 1 bis 4 bewerten. Neue Karten sind
-sofort fällig; eine verfehlte Karte kommt am Folgetag wieder.
+Gut = 4, Einfach = 5. Leertaste deckt auf, die Tasten 1 bis 4 bewerten.
+
+**Lernschritte**: SM-2 allein kennt nur ganze Tage — jede neue Karte käme selbst nach
+"Nochmal" frühestens am Folgetag wieder. Darüber liegen deshalb kurze Schritte innerhalb
+derselben Sitzung, nach Anki-Vorbild:
+
+- Eine **neue Karte** durchläuft `1 min → 10 min`, bevor sie in den Tagesrhythmus wechselt.
+  "Nochmal" setzt auf den ersten Schritt zurück, "Schwer" wiederholt den aktuellen,
+  "Gut" geht einen weiter, "Einfach" überspringt die Schritte (4 Tage statt 1).
+- Eine **vergessene Karte** aus dem Tagesrhythmus fällt nicht auf Null zurück: Sie kommt
+  in 10 Minuten wieder und behält 30 % ihres Intervalls (aus 30 Tagen werden 9, nicht 1).
+- Tagesintervalle liegen auf dem **Tagesbeginn**, nicht auf der Uhrzeit der Bewertung —
+  abends gelernt heißt am nächsten Morgen fällig.
+
+Deshalb ist `dueAt` ein Zeitstempel und kein Datum: "in 10 Minuten" muss ausdrückbar sein.
+`learningStep` ist der Index im Schrittplan und `-1`, sobald die Karte im Tagesrhythmus
+läuft. Die Lern-View lädt sich selbst nach, wenn die nächste Karte in unter 15 Minuten
+fällig wird.
 
 **M7 — Export**: CSV für Excel und TSV für Anki.
 

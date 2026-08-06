@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
 
@@ -90,7 +91,8 @@ class CsvDeckExportWriterTest {
 
     private Card card(String front, String back) {
         Card card = new Card(DECK, front, back);
-        card.recordReview(2.5, 0, 0, LocalDate.of(2026, 7, 28));
+        card.recordReview(2.5, 0, 0, 0,
+                LocalDate.of(2026, 7, 28).atStartOfDay(ZoneId.systemDefault()).toInstant());
         return card;
     }
 

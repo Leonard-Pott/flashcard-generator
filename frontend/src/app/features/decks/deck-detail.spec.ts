@@ -11,13 +11,34 @@ import { environment } from '../../../environments/environment';
 const deckId = 'a1000000-0000-4000-8000-000000000001';
 const deckUrl = `${environment.apiBaseUrl}/decks/${deckId}`;
 const cardsUrl = `${deckUrl}/cards`;
+const decksUrl = `${environment.apiBaseUrl}/decks`;
+const foldersUrl = `${environment.apiBaseUrl}/folders`;
+
+/** Anderer Stapel, den man hierher übernehmen kann. */
+const otherDeck: Deck = {
+  id: 'b2000000-0000-4000-8000-000000000002',
+  name: 'Altlasten',
+  description: null,
+  language: 'de',
+  examDate: null,
+  folderId: null,
+  cardCount: 5,
+  dueToday: 0,
+  nextDueAt: null,
+  createdAt: '2026-07-01T10:00:00Z',
+  updatedAt: '2026-07-01T10:00:00Z',
+};
 
 const deck: Deck = {
   id: deckId,
   name: 'ITIL Service Design',
   description: 'Kapitel 1-3',
   language: 'de',
+  examDate: null,
+  folderId: null,
   cardCount: 1,
+  dueToday: 1,
+  nextDueAt: null,
   createdAt: '2026-07-01T10:00:00Z',
   updatedAt: '2026-07-01T10:00:00Z',
 };
@@ -34,7 +55,8 @@ function card(overrides: Partial<Card> = {}): Card {
     easeFactor: 2.5,
     intervalDays: 0,
     repetitions: 0,
-    dueDate: '2026-07-27',
+    learningStep: 0,
+    dueAt: '2026-07-27T10:00:00Z',
     createdAt: '2026-07-27T10:00:00Z',
     updatedAt: '2026-07-27T10:00:00Z',
     ...overrides,
@@ -72,9 +94,16 @@ describe('DeckDetailPage', () => {
     field.dispatchEvent(new Event('input'));
   }
 
-  async function loadWith(cards: Card[]): Promise<void> {
+  /** Ordner und Stapelliste braucht die Seite fuer die Auswahlfelder. */
+  function flushLists(): void {
+    httpMock.expectOne(foldersUrl).flush([]);
+    httpMock.expectOne(decksUrl).flush([deck, otherDeck]);
+  }
+
+  async function loadWith(cards: Card[], loaded: Deck = deck): Promise<void> {
     await fixture.whenStable();
-    httpMock.expectOne(deckUrl).flush(deck);
+    httpMock.expectOne(deckUrl).flush(loaded);
+    flushLists();
     await fixture.whenStable();
     httpMock.expectOne(cardsUrl).flush(cards);
     await fixture.whenStable();
@@ -107,11 +136,7 @@ describe('DeckDetailPage', () => {
 
   it('should not offer an export for an empty deck', async () => {
     // Der Export haengt an cardCount des Stapels, nicht an der geladenen Kartenliste.
-    await fixture.whenStable();
-    httpMock.expectOne(deckUrl).flush({ ...deck, cardCount: 0 });
-    await fixture.whenStable();
-    httpMock.expectOne(cardsUrl).flush([]);
-    await fixture.whenStable();
+    await loadWith([], { ...deck, cardCount: 0 });
 
     expect((fixture.nativeElement as HTMLElement).querySelector('.exports')).toBeNull();
   });
@@ -203,6 +228,140 @@ describe('DeckDetailPage', () => {
     await fixture.whenStable();
 
     expect(text()).toContain('Dieser Stapel enthält noch keine Karten.');
+    // Die gelöschte Karte stand für heute an und faellt aus der Zählung.
+    expect(text()).toContain('0 heute offen');
+  });
+
+  it('should show what is due today and when the next card comes', async () => {
+    const morgen = new Date(Date.now() + 26 * 3_600_000).toISOString();
+    await loadWith([card()], { ...deck, dueToday: 4, nextDueAt: morgen });
+
+    expect(text()).toContain('4 heute offen');
+    expect(text()).toContain('nächste Karte am ');
+  });
+
+  it('should save an exam date and show the resulting cap', async () => {
+    await loadWith([card()]);
+
+    // Ortszeit, nicht UTC - sonst kippt der Test rund um Mitternacht auf neun Tage.
+    const inTenDays = new Date(Date.now() + 10 * 86_400_000).toLocaleDateString('sv-SE');
+    typeInto('input[name="examDate"]', inTenDays);
+    el<HTMLInputElement>('input[name="examDate"]').dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+
+    const request = httpMock.expectOne({ method: 'PATCH', url: deckUrl });
+    expect(request.request.body).toEqual({ examDate: inTenDays });
+    request.flush({ ...deck, examDate: inTenDays });
+    await fixture.whenStable();
+
+    expect(text()).toContain('Noch 10 Tage');
+    // Halbe Restzeit, wie in Sm2.capBeforeExam.
+    expect(text()).toContain('auf 5 Tag(e) gedeckelt');
+  });
+
+  it('should send an empty string to clear the exam date', async () => {
+    await loadWith([card()], { ...deck, examDate: '2026-08-14' });
+
+    typeInto('input[name="examDate"]', '');
+    el<HTMLInputElement>('input[name="examDate"]').dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+
+    const request = httpMock.expectOne({ method: 'PATCH', url: deckUrl });
+    expect(request.request.body).toEqual({ examDate: '' });
+    request.flush(deck);
+    await fixture.whenStable();
+
+    expect(text()).toContain('Ohne Termin plant SM-2');
+  });
+
+  /** Der Fehler, der den Anlass gab: ein Teil-PATCH darf den Termin nicht mitnehmen. */
+  it('should send only the changed field when moving into a folder', async () => {
+    await loadWith([card()], { ...deck, examDate: '2026-09-01' });
+
+    const select = el<HTMLSelectElement>('select[name="folder"]');
+    select.value = '';
+    select.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+
+    const request = httpMock.expectOne({ method: 'PATCH', url: deckUrl });
+    expect(Object.keys(request.request.body as object)).toEqual(['folderId']);
+    request.flush({ ...deck, examDate: '2026-09-01' });
+    await fixture.whenStable();
+
+    expect(text()).toContain('Noch');
+  });
+
+  it('should rename the deck', async () => {
+    await loadWith([card()]);
+
+    typeInto('input[name="deckName"]', 'ITIL Foundation');
+    el<HTMLInputElement>('input[name="deckName"]').dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+
+    const request = httpMock.expectOne({ method: 'PATCH', url: deckUrl });
+    expect(request.request.body).toEqual({ name: 'ITIL Foundation' });
+    request.flush({ ...deck, name: 'ITIL Foundation' });
+    await fixture.whenStable();
+
+    expect(el<HTMLHeadingElement>('h2').textContent).toContain('ITIL Foundation');
+  });
+
+  it('should not send a request for an unchanged name', async () => {
+    await loadWith([card()]);
+
+    el<HTMLInputElement>('input[name="deckName"]').dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+
+    httpMock.expectNone({ method: 'PATCH', url: deckUrl });
+  });
+
+  it('should merge another deck into this one', async () => {
+    await loadWith([card()]);
+
+    const select = el<HTMLSelectElement>('select[name="mergeSource"]');
+    expect(select.textContent).toContain('Altlasten');
+    select.value = otherDeck.id;
+    select.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+
+    [...(fixture.nativeElement as HTMLElement).querySelectorAll('p.merge button')]
+      .find((button) => button.textContent?.includes('Zusammenführen'))!
+      .dispatchEvent(new Event('click'));
+    await fixture.whenStable();
+
+    const request = httpMock.expectOne({ method: 'POST', url: `${deckUrl}/merge` });
+    expect(request.request.body).toEqual({ sourceDeckId: otherDeck.id });
+    request.flush({ ...deck, cardCount: 6 });
+    // Die Kartenliste wird danach frisch geladen.
+    httpMock.expectOne(cardsUrl).flush([card(), card({ id: 'uebernommen', front: 'Aus Altlasten' })]);
+    await fixture.whenStable();
+
+    expect(text()).toContain('6 Karten');
+    expect(text()).toContain('Aus Altlasten');
+    // Der uebernommene Stapel steht nicht mehr zur Auswahl.
+    expect((fixture.nativeElement as HTMLElement).querySelector('p.merge')).toBeNull();
+  });
+
+  it('should move the deck into a folder', async () => {
+    await fixture.whenStable();
+    httpMock.expectOne(deckUrl).flush(deck);
+    httpMock.expectOne(foldersUrl).flush([
+      { id: 'f1', name: 'Modul ITSM', createdAt: deck.createdAt, updatedAt: deck.updatedAt },
+    ]);
+    httpMock.expectOne(decksUrl).flush([deck]);
+    await fixture.whenStable();
+    httpMock.expectOne(cardsUrl).flush([card()]);
+    await fixture.whenStable();
+
+    const select = el<HTMLSelectElement>('select[name="folder"]');
+    select.value = 'f1';
+    select.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+
+    const request = httpMock.expectOne({ method: 'PATCH', url: deckUrl });
+    expect(request.request.body).toEqual({ folderId: 'f1' });
+    request.flush({ ...deck, folderId: 'f1' });
+    await fixture.whenStable();
   });
 
   it('should show a message when the deck does not exist', async () => {
@@ -210,6 +369,7 @@ describe('DeckDetailPage', () => {
     httpMock
       .expectOne(deckUrl)
       .flush({ detail: 'Stapel nicht gefunden: ' + deckId }, { status: 404, statusText: 'Not Found' });
+    flushLists();
     await fixture.whenStable();
 
     expect(text()).toContain('Stapel nicht gefunden');

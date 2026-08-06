@@ -11,7 +11,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.time.LocalDate;
+import java.time.Instant;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -52,19 +52,20 @@ class StudyControllerTest {
                 .andExpect(jsonPath("$.card.front").value("Was ist ein Incident?"))
                 .andExpect(jsonPath("$.card.back").value("Eine Unterbrechung."))
                 .andExpect(jsonPath("$.dueCount").value(5))
-                .andExpect(jsonPath("$.nextDueDate").doesNotExist());
+                .andExpect(jsonPath("$.nextDueAt").doesNotExist());
     }
 
     @Test
-    void nextReturnsNoCardButTheFollowingDueDate() throws Exception {
+    void nextReturnsNoCardButTheFollowingDueTime() throws Exception {
+        // Zehn Minuten entfernt: genau der Fall, den ein reines Datum nicht ausdruecken kann.
         given(service.nextDue(DECK.getId()))
-                .willReturn(new StudyService.NextCard(null, 0, LocalDate.of(2026, 7, 30)));
+                .willReturn(new StudyService.NextCard(null, 0, Instant.parse("2026-07-30T18:40:00Z")));
 
         mockMvc.perform(get("/api/decks/{deckId}/study/next", DECK.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.card").doesNotExist())
                 .andExpect(jsonPath("$.dueCount").value(0))
-                .andExpect(jsonPath("$.nextDueDate").value("2026-07-30"));
+                .andExpect(jsonPath("$.nextDueAt").value("2026-07-30T18:40:00Z"));
     }
 
     @Test
@@ -80,7 +81,7 @@ class StudyControllerTest {
     @Test
     void reviewReturnsTheUpdatedCard() throws Exception {
         Card card = new Card(DECK, "Frage", "Antwort");
-        card.recordReview(2.6, 6, 2, LocalDate.of(2026, 8, 2));
+        card.recordReview(2.6, 6, 2, Sm2.GRADUATED, Instant.parse("2026-08-02T00:00:00Z"));
         given(service.review(eq(card.getId()), anyInt())).willReturn(card);
 
         mockMvc.perform(post("/api/cards/{cardId}/review", card.getId())
@@ -90,7 +91,7 @@ class StudyControllerTest {
                 .andExpect(jsonPath("$.easeFactor").value(2.6))
                 .andExpect(jsonPath("$.intervalDays").value(6))
                 .andExpect(jsonPath("$.repetitions").value(2))
-                .andExpect(jsonPath("$.dueDate").value("2026-08-02"));
+                .andExpect(jsonPath("$.dueAt").value("2026-08-02T00:00:00Z"));
 
         verify(service).review(card.getId(), 5);
     }

@@ -16,7 +16,24 @@
       <option value="en">Englisch</option>
     </select>
   </label>
+  <label>
+    Ordner
+    <select name="folder" [(ngModel)]="newFolderId">
+      <option value="">ohne Ordner</option>
+      @for (folder of folders(); track folder.id) {
+        <option [value]="folder.id">{{ folder.name }}</option>
+      }
+    </select>
+  </label>
   <button type="submit" [disabled]="creating()">Stapel anlegen</button>
+</form>
+
+<form class="new-folder" (ngSubmit)="createFolder()">
+  <label>
+    Neuer Ordner
+    <input name="folderName" [(ngModel)]="newFolderName" placeholder="z. B. Modul Datenbanken" />
+  </label>
+  <button type="submit">Ordner anlegen</button>
 </form>
 
 @if (error(); as message) {
@@ -25,37 +42,82 @@
 
 @if (loading()) {
   <p class="muted">Lade Stapel …</p>
-} @else if (decks().length === 0) {
+} @else if (decks().length === 0 && folders().length === 0) {
   <p class="muted">Noch keine Stapel angelegt.</p>
 } @else {
-  <table class="decks">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Sprache</th>
-        <th class="numeric">Karten</th>
-        <th>Angelegt</th>
-        <th><span class="visually-hidden">Aktionen</span></th>
-      </tr>
-    </thead>
-    <tbody>
-      @for (deck of decks(); track deck.id) {
-        <tr>
-          <td>
-            <a [routerLink]="['/decks', deck.id]">{{ deck.name }}</a>
-            @if (deck.description) {
-              <span class="decks__description">{{ deck.description }}</span>
+  @for (group of groups(); track groupKey(group)) {
+    <details
+      class="folder"
+      [open]="isOpen(groupKey(group))"
+      (toggle)="setOpen(groupKey(group), $any($event.target).open)"
+    >
+      <summary class="folder__title">
+        {{ group.folder?.name ?? 'Ohne Ordner' }}
+        <span class="muted">({{ group.decks.length }})</span>
+        @if (group.folder; as folder) {
+          <button type="button" class="link" (click)="renameFolder(folder, $event)">
+            Umbenennen
+          </button>
+          <button type="button" class="link danger" (click)="deleteFolder(folder, $event)">
+            Ordner löschen
+          </button>
+        }
+      </summary>
+
+      @if (group.decks.length === 0) {
+        <p class="muted">Noch kein Stapel in diesem Ordner.</p>
+      } @else {
+        <table class="decks">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Sprache</th>
+              <th class="numeric">Karten</th>
+              <th class="numeric">Heute offen</th>
+              <th>Nächste Karte</th>
+              <th>Ordner</th>
+              <th><span class="visually-hidden">Aktionen</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (deck of group.decks; track deck.id) {
+              <tr>
+                <td>
+                  <a [routerLink]="['/decks', deck.id]">{{ deck.name }}</a>
+                  @if (deck.description) {
+                    <span class="decks__description">{{ deck.description }}</span>
+                  }
+                </td>
+                <td><span class="badge">{{ deck.language }}</span></td>
+                <td class="numeric">{{ deck.cardCount }}</td>
+                <td class="numeric">{{ deck.dueToday }}</td>
+                <td>{{ deck.nextDueAt ? formatDue(deck.nextDueAt) : '–' }}</td>
+                <td>
+                  <select
+                    class="folder-select"
+                    [attr.aria-label]="'Ordner von ' + deck.name"
+                    (change)="moveDeck(deck, $any($event.target).value)"
+                  >
+                    <option value="" [selected]="deck.folderId === null">ohne Ordner</option>
+                    @for (folder of folders(); track folder.id) {
+                      <option [value]="folder.id" [selected]="folder.id === deck.folderId">
+                        {{ folder.name }}
+                      </option>
+                    }
+                  </select>
+                </td>
+                <td>
+                  <button type="button" class="danger" (click)="deleteDeck(deck)">Löschen</button>
+                </td>
+              </tr>
             }
-          </td>
-          <td><span class="badge">{{ deck.language }}</span></td>
-          <td class="numeric">{{ deck.cardCount }}</td>
-          <td>{{ formatDate(deck.createdAt) }}</td>
-          <td>
-            <button type="button" class="danger" (click)="deleteDeck(deck)">Löschen</button>
-          </td>
-        </tr>
+          </tbody>
+        </table>
       }
-    </tbody>
-  </table>
-  <p class="hint">Das Löschen eines Stapels entfernt auch alle darin enthaltenen Karten.</p>
+    </details>
+  }
+  <p class="hint">
+    Das Löschen eines Stapels entfernt auch alle darin enthaltenen Karten. Ein gelöschter Ordner
+    lässt seine Stapel stehen.
+  </p>
 }

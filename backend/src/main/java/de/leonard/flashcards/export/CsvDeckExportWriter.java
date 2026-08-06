@@ -1,6 +1,8 @@
 package de.leonard.flashcards.export;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 import org.springframework.stereotype.Component;
@@ -44,7 +46,8 @@ public class CsvDeckExportWriter implements DeckExportWriter {
                     card.getFront(),
                     card.getBack(),
                     String.join(", ", card.getTags()),
-                    card.getDueDate().toString()));
+                    // Im Export interessiert nur der Tag, nicht die Uhrzeit des Lernschritts.
+                    LocalDate.ofInstant(card.getDueAt(), ZoneId.systemDefault()).toString()));
         }
 
         byte[] body = out.toString().getBytes(StandardCharsets.UTF_8);

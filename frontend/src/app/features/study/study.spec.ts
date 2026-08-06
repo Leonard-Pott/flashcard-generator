@@ -17,7 +17,11 @@ const deck: Deck = {
   name: 'ITIL Service Design',
   description: null,
   language: 'de',
+  examDate: null,
+  folderId: null,
   cardCount: 3,
+  dueToday: 3,
+  nextDueAt: null,
   createdAt: '2026-07-01T10:00:00Z',
   updatedAt: '2026-07-01T10:00:00Z',
 };
@@ -34,7 +38,8 @@ function card(overrides: Partial<Card> = {}): Card {
     easeFactor: 2.5,
     intervalDays: 0,
     repetitions: 0,
-    dueDate: '2026-07-27',
+    learningStep: 0,
+    dueAt: '2026-07-27T10:00:00Z',
     createdAt: '2026-07-27T10:00:00Z',
     updatedAt: '2026-07-27T10:00:00Z',
     ...overrides,
@@ -42,7 +47,12 @@ function card(overrides: Partial<Card> = {}): Card {
 }
 
 function next(overrides: Partial<NextCard> = {}): NextCard {
-  return { card: card(), dueCount: 3, nextDueDate: null, ...overrides };
+  return { card: card(), dueCount: 3, nextDueAt: null, ...overrides };
+}
+
+/** Absolute Termine relativ zur Testlaufzeit, damit "in X Minuten" reproduzierbar bleibt. */
+function inMinutes(minutes: number): string {
+  return new Date(Date.now() + minutes * 60_000).toISOString();
 }
 
 describe('StudyPage', () => {
@@ -144,11 +154,14 @@ describe('StudyPage', () => {
       url: `${environment.apiBaseUrl}/cards/${card().id}/review`,
     });
     expect(review.request.body).toEqual({ quality: 0 });
-    review.flush(card());
+    review.flush(card({ learningStep: 0 }));
     await fixture.whenStable();
 
-    httpMock.expectOne(nextUrl).flush(next({ card: null, dueCount: 0, nextDueDate: '2026-07-28' }));
+    // "Nochmal" schickt die Karte in den Lernschritt: Minuten, kein Tag.
+    httpMock.expectOne(nextUrl).flush(next({ card: null, dueCount: 0, nextDueAt: inMinutes(1) }));
     await fixture.whenStable();
+
+    expect(text()).toContain('gleich');
   });
 
   it('should reveal with the space bar and rate with the number keys', async () => {
@@ -169,19 +182,47 @@ describe('StudyPage', () => {
     review.flush(card());
     await fixture.whenStable();
 
-    httpMock.expectOne(nextUrl).flush(next({ card: null, dueCount: 0, nextDueDate: null }));
+    httpMock.expectOne(nextUrl).flush(next({ card: null, dueCount: 0, nextDueAt: null }));
     await fixture.whenStable();
   });
 
-  it('should show when the next card is due once nothing is left', async () => {
-    await load(next({ card: null, dueCount: 0, nextDueDate: '2026-08-02' }));
+  it('should show the date when the next card is days away', async () => {
+    const inThreeDays = new Date(Date.now() + 3 * 86_400_000);
+    await load(next({ card: null, dueCount: 0, nextDueAt: inThreeDays.toISOString() }));
 
-    expect(text()).toContain('Für heute geschafft.');
-    expect(text()).toContain('2. August 2026');
+    expect(text()).toContain('Für den Moment geschafft.');
+    expect(text()).toContain(
+      new Intl.DateTimeFormat('de-DE', { dateStyle: 'long' }).format(inThreeDays)
+    );
+  });
+
+  it('should show the remaining minutes of a pending learning step', async () => {
+    await load(next({ card: null, dueCount: 0, nextDueAt: inMinutes(10) }));
+
+    expect(text()).toContain('in 10 Minuten');
+  });
+
+  it('should reload itself once a learning step comes due', async () => {
+    // shouldAdvanceTime lässt die echten Microtasks weiterlaufen, sonst hängt whenStable.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      await load(next({ card: null, dueCount: 0, nextDueAt: inMinutes(10) }));
+
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
+      await fixture.whenStable();
+
+      // Ohne Zutun des Lernenden ist die Karte aus dem Lernschritt wieder da.
+      httpMock.expectOne(nextUrl).flush(next({ card: card({ front: 'Wiederholung' }) }));
+      await fixture.whenStable();
+
+      expect(text()).toContain('Wiederholung');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('should say when the deck has no cards at all', async () => {
-    await load(next({ card: null, dueCount: 0, nextDueDate: null }));
+    await load(next({ card: null, dueCount: 0, nextDueAt: null }));
 
     expect(text()).toContain('noch keine Karten');
   });

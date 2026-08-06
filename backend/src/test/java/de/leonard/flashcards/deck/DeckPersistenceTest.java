@@ -1,7 +1,12 @@
 package de.leonard.flashcards.deck;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -49,10 +54,14 @@ class DeckPersistenceTest {
     @Autowired
     private TestEntityManager entityManager;
 
+    @Autowired
+    private FolderRepository folderRepository;
+
     @BeforeEach
     void clean() {
         cardRepository.deleteAll();
         deckRepository.deleteAll();
+        folderRepository.deleteAll();
         documentRepository.deleteAll();
     }
 
@@ -122,13 +131,68 @@ class DeckPersistenceTest {
         cardRepository.save(new Card(itil, "Frage 1", "Antwort 1"));
         cardRepository.saveAndFlush(new Card(itil, "Frage 2", "Antwort 2"));
 
-        List<DeckRepository.DeckWithCardCount> decks = deckRepository.findAllWithCardCount();
+        List<DeckRepository.DeckWithCardCount> decks =
+                deckRepository.findAllWithCardCount(Instant.now(), endOfDay());
 
         // Sortierung nach Name, unabhaengig von Gross- und Kleinschreibung.
         assertThat(decks).extracting(d -> d.getDeck().getName()).containsExactly("Anatomie", "ITIL");
         assertThat(decks).extracting(DeckRepository.DeckWithCardCount::getCardCount)
                 .containsExactly(0L, 2L);
         assertThat(leer.getId()).isNotNull();
+    }
+
+    @Test
+    void countsWhatIsDueTodayAndFindsTheNextDate() {
+        Deck deck = deckRepository.save(new Deck("ITIL", null, Language.DE));
+        // Frisch angelegte Karten sind sofort faellig.
+        cardRepository.save(new Card(deck, "Heute 1", "A"));
+        cardRepository.save(new Card(deck, "Heute 2", "B"));
+
+        Instant inDreiTagen = Instant.now().plus(3, ChronoUnit.DAYS);
+        Card spaeter = new Card(deck, "Spaeter", "C");
+        spaeter.recordReview(2.5, 3, 2, 0, inDreiTagen);
+        cardRepository.saveAndFlush(spaeter);
+
+        DeckRepository.DeckWithCardCount result =
+                deckRepository.findWithCardCount(deck.getId(), Instant.now(), endOfDay()).orElseThrow();
+
+        assertThat(result.getCardCount()).isEqualTo(3);
+        assertThat(result.getDueToday()).isEqualTo(2);
+        assertThat(result.getNextDueAt()).isCloseTo(inDreiTagen, within(1, ChronoUnit.SECONDS));
+    }
+
+    @Test
+    void movesAllCardsToAnotherDeck() {
+        Deck ziel = deckRepository.save(new Deck("Ziel", null, Language.DE));
+        Deck quelle = deckRepository.save(new Deck("Quelle", null, Language.DE));
+        cardRepository.save(new Card(ziel, "Bleibt", "A"));
+        cardRepository.save(new Card(quelle, "Wandert 1", "B"));
+        cardRepository.saveAndFlush(new Card(quelle, "Wandert 2", "C"));
+
+        assertThat(cardRepository.moveAllToDeck(quelle.getId(), ziel)).isEqualTo(2);
+
+        assertThat(cardRepository.countByDeckId(ziel.getId())).isEqualTo(3);
+        assertThat(cardRepository.countByDeckId(quelle.getId())).isZero();
+    }
+
+    @Test
+    void deletingFolderKeepsItsDecks() {
+        Folder folder = folderRepository.saveAndFlush(new Folder("Semester 3"));
+        Deck deck = new Deck("ITIL", null, Language.DE);
+        deck.moveTo(folder.getId());
+        deckRepository.saveAndFlush(deck);
+        entityManager.clear();
+
+        folderRepository.deleteById(folder.getId());
+        folderRepository.flush();
+        entityManager.clear();
+
+        // ON DELETE SET NULL: der Stapel bleibt, nur ohne Ordner.
+        assertThat(deckRepository.findById(deck.getId()).orElseThrow().getFolderId()).isNull();
+    }
+
+    private Instant endOfDay() {
+        return LocalDate.now().plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
     }
 
     @Test
