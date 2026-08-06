@@ -24,3 +24,17 @@ yarn-error.log*
 .vscode/
 .DS_Store
 Thumbs.db
+
+flashcard-generator-plan.md
+
+# --- Datenbank-Sicherungen (enthalten den kompletten Lernstand) ---
+backups/
+backup-*.sql
+
+# --- Claude / graphify ---
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+.mcp.json
+graphify-out/
+.graphify*
