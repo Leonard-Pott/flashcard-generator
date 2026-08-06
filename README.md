@@ -28,7 +28,7 @@ in der Liste, statt den Upload abzulehnen.
 Stapelliste und Kartentabelle mit Inline-Bearbeitung.
 
 ```
-GET    /api/decks                 mit Kartenzahl je Stapel
+GET    /api/decks                 mit Kartenzahl, heute offenen Karten und nächstem Termin
 POST   /api/decks
 GET    /api/decks/{id}
 PATCH  /api/decks/{id}            nur gesendete Felder werden geändert
@@ -122,6 +122,15 @@ Deshalb ist `dueAt` ein Zeitstempel und kein Datum: "in 10 Minuten" muss ausdrü
 läuft. Die Lern-View lädt sich selbst nach, wenn die nächste Karte in unter 15 Minuten
 fällig wird.
 
+**Prüfungstermin**: SM-2 optimiert auf dauerhaftes Behalten mit möglichst wenigen
+Wiederholungen. Vor einem festen Termin ist das die falsche Zielgröße — eine Karte mit
+15 Tagen Intervall sieht man vor einer Prüfung in zehn Tagen kein einziges Mal wieder.
+Ist auf dem Stapel ein `examDate` gesetzt, deckelt der Scheduler die Intervalle deshalb
+auf die **halbe Restzeit** (mindestens ein Tag), damit jede Karte vorher mindestens
+einmal wiederkommt. Ohne Termin bleibt es beim normalen SM-2. Der Termin hängt am
+einzelnen Stapel, nicht am Ordner: mehrere Stapel eines Moduls können auf verschiedene
+Klausuren zielen.
+
 **M7 — Export**: CSV für Excel und TSV für Anki.
 
 ```
@@ -139,6 +148,36 @@ importieren. Da TSV keine Maskierung kennt, werden dort Zeilenumbrüche zu `<br>
 Tabulatoren zu Leerzeichen; Leerzeichen in Tags werden zu Bindestrichen, weil Anki Tags am
 Leerzeichen trennt.
 
+**Organisation**: Ordner, Zusammenführen und Fälligkeiten je Stapel — Zugaben nach M7,
+sobald die Stapelliste zweistellig wird.
+
+```
+GET    /api/folders
+POST   /api/folders               Body: { "name": "Modul Datenbanken" }
+PATCH  /api/folders/{id}          umbenennen
+DELETE /api/folders/{id}          die enthaltenen Stapel bleiben bestehen
+
+POST   /api/decks/{id}/merge      Body: { "sourceDeckId": "..." }
+```
+
+- **Fälligkeiten**: Liste und Detailseite zeigen, wie viele Karten heute noch offen sind
+  (Überfälliges eingeschlossen) und wann die nächste fällig wird. Beides kommt aus
+  derselben Abfrage wie die Kartenzahl — eine Zählung je Stapel wäre ein N+1-Problem.
+- **Umbenennen** läuft über das bestehende `PATCH /api/decks/{id}`.
+- **Zusammenführen** hängt alle Karten des Quellstapels samt Lernstand an den Zielstapel
+  und löscht die leere Hülle. Doppelte Karten werden dabei nicht erkannt.
+- **Ordner** gruppieren Stapel, etwa je Uni-Modul, und sind flach: ein Stapel liegt in
+  höchstens einem Ordner, Ordner enthalten keine Ordner. Ein gelöschter Ordner nimmt seine
+  Stapel nicht mit (`ON DELETE SET NULL`). In der Übersicht lassen sie sich auf- und
+  zuklappen; zugeklappte Ordner merkt sich der Browser.
+
+**Konvention der PATCH-Formate**: Ein Feld, das fehlt oder `null` ist, bleibt unverändert;
+ein **leerer String** leert es. Das gilt für `description`, `examDate` und `folderId`
+gleichermaßen. Der naheliegende Weg über `Optional` funktioniert hier nicht: Jackson macht
+aus einem fehlenden `Optional`-Feld ein `Optional.empty()`, womit "nicht mitgeschickt"
+nicht mehr von "ausdrücklich `null`" zu unterscheiden ist — jedes Teil-PATCH hätte den
+Prüfungstermin gelöscht.
+
 ## Voraussetzungen
 
 - JDK 21 oder neuer (getestet mit JDK 24)
@@ -151,6 +190,13 @@ Leerzeichen trennt.
 ```bash
 cp .env.example .env
 ```
+
+Unter Windows nehmen dir zwei Skripte in der Projektwurzel die drei Schritte ab:
+`start.bat` fährt Postgres, Backend und Frontend hoch und öffnet den Browser,
+`stop.bat` legt vorher einen Dump nach `backups/YYYY-MM-DD.sql` und fährt die Container
+herunter. Die Sicherungen bleiben lokal — sie enthalten den kompletten Lernstand.
+
+Von Hand geht es so:
 
 1. **Postgres starten** (Projektwurzel):
 
