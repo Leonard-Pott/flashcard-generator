@@ -3,15 +3,56 @@
 Lokale Single-User-Webanwendung: Dokumente (PDF, DOCX, PPTX, TXT, Markdown) hochladen,
 daraus per LLM Karteikarten generieren, bearbeiten, lernen und exportieren.
 
+Angular 21 im Frontend, Spring Boot 3.5 im Backend, Postgres 16 im Container. Alles läuft
+auf dem eigenen Rechner; nach außen geht nur der Aufruf an die Gemini-API.
+
 Spezifikation und Meilensteine: [flashcard-generator-plan.md](flashcard-generator-plan.md)
 
-## Stand
+## Schnellstart
 
-**M1 — Grundgerüst**: Docker Compose mit Postgres 16, Spring Boot 3.5 mit
-Flyway-Baseline, Angular-Workspace, CORS für `localhost:4200`, `GET /api/health`.
+**Voraussetzungen**: JDK 21 oder neuer (getestet mit JDK 24), Maven 3.9+, Node.js 22+ mit
+npm, Docker Desktop.
 
-**M2 — Dokumenten-Upload**: Multipart-Upload mit Textextraktion über Apache Tika
-(PDF, DOCX, PPTX, TXT, Markdown), Ablage in Postgres, Liste mit Drag & Drop im Frontend.
+```bash
+cp .env.example .env
+```
+
+In die `.env` gehört der `GEMINI_API_KEY` aus dem [Google AI Studio](https://aistudio.google.com/apikey).
+Ohne ihn läuft alles außer der Generierung.
+
+**Unter Windows** nehmen zwei Skripte in der Projektwurzel die Handgriffe ab:
+
+- `start.bat` fährt Docker, Postgres, Backend und Frontend hoch und öffnet den Browser,
+  sobald beide Server antworten. Backend und Frontend laufen ohne Fenster weiter, ihre
+  Ausgabe landet in `logs\`.
+- `stop.bat` sichert den Lernstand nach `backups\JJJJ-MM-TT.sql`, beendet die Server über
+  ihre Ports und fährt die Container herunter.
+
+Beim ersten Mal vorher einmal `npm install` im Ordner `frontend`.
+
+**Von Hand** sind es drei Schritte:
+
+1. **Postgres** (Projektwurzel): `docker compose up -d`
+2. **Backend** (Ordner `backend`): `mvn spring-boot:run` — http://127.0.0.1:8080
+3. **Frontend** (Ordner `frontend`): `npm start` — http://localhost:4200
+
+Die Startseite zeigt den Status von Backend und Datenbank. Direkt prüfen lässt sich das mit:
+
+```bash
+curl http://localhost:8080/api/health
+```
+
+## Bedienung
+
+Der Weg durch die Anwendung ist `/upload` → `/decks` → `/decks/:id` → `/decks/:id/study`:
+Dokument hochladen, daraus einen Stapel generieren lassen, Karten nachbearbeiten, lernen,
+bei Bedarf exportieren.
+
+> **Tageskontingent beachten.** Der Free Tier erlaubt für `gemini-3.6-flash` nur **20
+> Anfragen pro Tag** — eine je Textabschnitt. Ein Dokument mit 150.000 Zeichen ergibt rund
+> 25 Abschnitte und passt damit nicht in einen Tag. Der Generierungs-Dialog warnt vorher.
+
+## Dokumente
 
 ```
 POST   /api/documents      multipart/form-data, Feldname "file", max. 25 MB
@@ -20,12 +61,11 @@ GET    /api/documents/{id}
 DELETE /api/documents/{id}
 ```
 
-Gespeichert wird nur der extrahierte Text, nicht die Originaldatei. Ein Dokument ohne
-Textebene (typisch für gescannte PDFs) landet mit Status `FAILED` und einer Begründung
-in der Liste, statt den Upload abzulehnen.
+Die Textextraktion läuft über Apache Tika. Gespeichert wird nur der extrahierte Text, nicht
+die Originaldatei. Ein Dokument ohne Textebene (typisch für gescannte PDFs) landet mit
+Status `FAILED` und einer Begründung in der Liste, statt den Upload abzulehnen.
 
-**M3 — Deck- und Card-CRUD**: Stapel und Karten anlegen, ändern und löschen; im Frontend
-Stapelliste und Kartentabelle mit Inline-Bearbeitung.
+## Stapel und Karten
 
 ```
 GET    /api/decks                 mit Kartenzahl, heute offenen Karten und nächstem Termin
@@ -42,22 +82,77 @@ DELETE /api/cards/{id}
 
 Neue Karten starten mit den SM-2-Werten aus dem Plan (`easeFactor` 2.5, `intervalDays` 0,
 `repetitions` 0), stehen auf dem ersten Lernschritt (`learningStep` 0) und sind sofort
-fällig. Ausgewertet werden diese Felder erst in M6.
+fällig.
 
-**M4 — Gemini-Anbindung**: `LlmClient`-Interface mit `GeminiLlmClient` als einziger
-Implementierung, inklusive Drosselung auf `requests-per-minute` und Wiederholung mit
-exponentiellem Backoff (2s/4s/8s/16s) bei HTTP 429, 5xx und Netzwerkfehlern.
+Im Frontend zeigt die Stapelliste zu jedem Stapel, wie viele Karten heute noch offen sind
+(Überfälliges eingeschlossen) und wann die nächste fällig wird. Beides kommt aus derselben
+Abfrage wie die Kartenzahl — eine Zählung je Stapel wäre ein N+1-Problem.
+
+### Ordner und Zusammenführen
+
+```
+GET    /api/folders
+POST   /api/folders               Body: { "name": "Modul Datenbanken" }
+PATCH  /api/folders/{id}          umbenennen
+DELETE /api/folders/{id}          die enthaltenen Stapel bleiben bestehen
+
+POST   /api/decks/{id}/merge      Body: { "sourceDeckId": "..." }
+```
+
+- **Ordner** gruppieren Stapel, etwa je Uni-Modul, und sind flach: ein Stapel liegt in
+  höchstens einem Ordner, Ordner enthalten keine Ordner. Ein gelöschter Ordner nimmt seine
+  Stapel nicht mit (`ON DELETE SET NULL`). In der Übersicht lassen sie sich auf- und
+  zuklappen; zugeklappte Ordner merkt sich der Browser.
+- **Umbenennen** läuft über das bestehende `PATCH /api/decks/{id}`.
+- **Zusammenführen** hängt alle Karten des Quellstapels samt Lernstand an den Zielstapel
+  und löscht die leere Hülle. Doppelte Karten werden dabei nicht erkannt.
+
+### Konvention der PATCH-Formate
+
+Ein Feld, das fehlt oder `null` ist, bleibt unverändert; ein **leerer String** leert es.
+Das gilt für `description`, `examDate` und `folderId` gleichermaßen. Der naheliegende Weg
+über `Optional` funktioniert hier nicht: Jackson macht aus einem fehlenden `Optional`-Feld
+ein `Optional.empty()`, womit "nicht mitgeschickt" nicht mehr von "ausdrücklich `null`" zu
+unterscheiden ist — jedes Teil-PATCH hätte den Prüfungstermin gelöscht.
+
+## Generierung
+
+```
+POST /api/generation-jobs      → 202 Accepted, Verarbeitung läuft im Hintergrund
+GET  /api/generation-jobs/{id} → Fortschritt für das Polling
+GET  /api/generation-jobs
+```
+
+Im Frontend werden Dokumente per Checkbox ausgewählt (nur solche mit extrahiertem Text),
+konfiguriert und gestartet; danach zeigt `/jobs/:id` den Fortschritt im Zwei-Sekunden-Takt
+samt geschätzter Restdauer.
+
+Der Ablauf: Chunking (30.000 Zeichen, 500 Overlap, Trennung an Absatzgrenzen), Prompting je
+Sprache und Kartenstil, defensives JSON-Parsen, Deduplizierung.
+
+Die Abschnittsgröße ist am Tageskontingent ausgerichtet, nicht am Modell: Jeder Abschnitt
+ist eine Anfrage, und davon gibt es nur 20 pro Tag. Ein Vorlesungsskript mit 139.000
+Zeichen braucht damit 5 Anfragen statt 25. Abschnitte ohne Lernstoff — Deckblätter,
+Inhaltsverzeichnisse, Seitenzahlen — werden vorher aussortiert und kosten keine Anfrage.
+
+Die Abschnitte werden **nacheinander** verarbeitet — der Free Tier verträgt keine
+parallelen Aufrufe. Scheitert ein Abschnitt endgültig, wird er übersprungen und im Job
+vermerkt; der Lauf geht weiter. Nur wenn kein einziger Abschnitt durchkommt, gilt der Job
+als `FAILED`.
+
+### Anbindung an Gemini
+
+`LlmClient`-Interface mit `GeminiLlmClient` als einziger Implementierung, inklusive
+Drosselung auf `requests-per-minute` und Wiederholung mit exponentiellem Backoff
+(2s/4s/8s/16s) bei HTTP 429, 5xx und Netzwerkfehlern.
 
 Der API-Key kommt ausschließlich aus der Umgebungsvariable `GEMINI_API_KEY`. Das Modell
 steht in `application.yml` unter `llm.gemini.model`; eingetragen ist `gemini-3.6-flash`.
-
-**Tageskontingent:** Der Free Tier erlaubt für `gemini-3.6-flash` nur **20 Anfragen pro
-Tag** — eine je Textabschnitt. Ein Dokument mit 150.000 Zeichen ergibt rund 25 Abschnitte
-und passt damit nicht in einen Tag. Der Generierungs-Dialog warnt vorher. Der hinterlegte
-Wert steht unter `llm.gemini.daily-request-budget` und lässt sich mit `GEMINI_DAILY_BUDGET`
-überschreiben, wenn du ein anderes Modell oder einen bezahlten Tarif verwendest.
-Achtung: In der Modellliste der API aufzutauchen heißt nicht, dass ein Modell nutzbar ist —
-`gemini-2.5-flash` steht dort, wird für neue Keys aber mit HTTP 404 abgelehnt.
+Der hinterlegte Tageswert steht unter `llm.gemini.daily-request-budget` und lässt sich mit
+`GEMINI_DAILY_BUDGET` überschreiben, wenn du ein anderes Modell oder einen bezahlten Tarif
+verwendest; er dient nur der Vorwarnung im Frontend — durchgesetzt wird das Kontingent von
+Google. Achtung: In der Modellliste der API aufzutauchen heißt nicht, dass ein Modell
+nutzbar ist — `gemini-2.5-flash` steht dort, wird für neue Keys aber mit HTTP 404 abgelehnt.
 
 Für einen einmaligen echten Aufruf gibt es einen Testendpunkt, der standardmäßig aus ist,
 weil jeder Aufruf vom Tageskontingent abgeht:
@@ -70,44 +165,22 @@ LLM_PROBE_ENABLED=true mvn spring-boot:run
 curl -X POST http://localhost:8080/api/llm/probe -H "Content-Type: application/json" -d "{\"userPrompt\":\"Erstelle zwei Lernkarten zum Begriff Incident.\"}"
 ```
 
-**M5 — Generierung**: Chunking (30.000 Zeichen, 500 Overlap, Trennung an Absatzgrenzen),
-Prompting je Sprache und Kartenstil, defensives JSON-Parsen, Deduplizierung und asynchrone
-Verarbeitung mit Fortschritts-Polling.
-
-Die Abschnittsgröße ist am Tageskontingent ausgerichtet, nicht am Modell: Jeder Abschnitt
-ist eine Anfrage, und davon gibt es nur 20 pro Tag. Ein Vorlesungsskript mit 139.000
-Zeichen braucht damit 5 Anfragen statt 25. Abschnitte ohne Lernstoff — Deckblätter,
-Inhaltsverzeichnisse, Seitenzahlen — werden vorher aussortiert und kosten keine Anfrage.
-
-```
-POST /api/generation-jobs      → 202 Accepted, Verarbeitung läuft im Hintergrund
-GET  /api/generation-jobs/{id} → Fortschritt für das Polling
-GET  /api/generation-jobs
-```
-
-Die Abschnitte werden **nacheinander** verarbeitet — der Free Tier verträgt keine
-parallelen Aufrufe. Scheitert ein Abschnitt endgültig, wird er übersprungen und im Job
-vermerkt; der Lauf geht weiter. Nur wenn kein einziger Abschnitt durchkommt, gilt der Job
-als `FAILED`.
-
-Im Frontend werden Dokumente per Checkbox ausgewählt (nur solche mit extrahiertem Text),
-konfiguriert und gestartet; danach zeigt `/jobs/:id` den Fortschritt im Zwei-Sekunden-Takt
-samt geschätzter Restdauer.
-
-**M6 — Lernmodus (SM-2)**: Wiederholungslogik nach Abschnitt 10 des Plans, Endpunkte für
-fällige Karten und Bewertungen, Lern-View unter `/decks/:id/study`.
+## Lernen
 
 ```
 GET  /api/decks/{id}/study/next   fällige Karte, offene Anzahl, nächster Termin
 POST /api/cards/{id}/review       Body: { "quality": 0..5 }
 ```
 
-Die vier Knöpfe des Lernmodus bilden auf SM-2-Bewertungen ab: Nochmal = 0, Schwer = 3,
-Gut = 4, Einfach = 5. Leertaste deckt auf, die Tasten 1 bis 4 bewerten.
+Die vier Knöpfe der Lern-View unter `/decks/:id/study` bilden auf SM-2-Bewertungen ab:
+Nochmal = 0, Schwer = 3, Gut = 4, Einfach = 5. Leertaste deckt auf, die Tasten 1 bis 4
+bewerten.
 
-**Lernschritte**: SM-2 allein kennt nur ganze Tage — jede neue Karte käme selbst nach
-"Nochmal" frühestens am Folgetag wieder. Darüber liegen deshalb kurze Schritte innerhalb
-derselben Sitzung, nach Anki-Vorbild:
+### Lernschritte
+
+SM-2 allein kennt nur ganze Tage — jede neue Karte käme selbst nach "Nochmal" frühestens am
+Folgetag wieder. Darüber liegen deshalb kurze Schritte innerhalb derselben Sitzung, nach
+Anki-Vorbild:
 
 - Eine **neue Karte** durchläuft `1 min → 10 min`, bevor sie in den Tagesrhythmus wechselt.
   "Nochmal" setzt auf den ersten Schritt zurück, "Schwer" wiederholt den aktuellen,
@@ -117,27 +190,30 @@ derselben Sitzung, nach Anki-Vorbild:
 - Tagesintervalle liegen auf dem **Tagesbeginn**, nicht auf der Uhrzeit der Bewertung —
   abends gelernt heißt am nächsten Morgen fällig.
 
-**Freies Üben**: `/decks/:id/study?frei=1` geht alle Karten des Stapels gemischt durch,
-unabhängig von der Fälligkeit. Es wird kein Review geschickt, die Wiederholungszeiten
-bleiben also unverändert — die Runde läuft rein im Browser über `GET /api/decks/{id}/cards`.
-"Nochmal" (Taste 1) legt die Karte ans Ende der Runde, "Weiter" (Taste 2) hakt sie ab.
-In der Stapelansicht steht der Link neben „Lernen".
-
 Deshalb ist `dueAt` ein Zeitstempel und kein Datum: "in 10 Minuten" muss ausdrückbar sein.
 `learningStep` ist der Index im Schrittplan und `-1`, sobald die Karte im Tagesrhythmus
 läuft. Die Lern-View lädt sich selbst nach, wenn die nächste Karte in unter 15 Minuten
 fällig wird.
 
-**Prüfungstermin**: SM-2 optimiert auf dauerhaftes Behalten mit möglichst wenigen
-Wiederholungen. Vor einem festen Termin ist das die falsche Zielgröße — eine Karte mit
-15 Tagen Intervall sieht man vor einer Prüfung in zehn Tagen kein einziges Mal wieder.
-Ist auf dem Stapel ein `examDate` gesetzt, deckelt der Scheduler die Intervalle deshalb
-auf die **halbe Restzeit** (mindestens ein Tag), damit jede Karte vorher mindestens
-einmal wiederkommt. Ohne Termin bleibt es beim normalen SM-2. Der Termin hängt am
-einzelnen Stapel, nicht am Ordner: mehrere Stapel eines Moduls können auf verschiedene
-Klausuren zielen.
+### Prüfungstermin
 
-**M7 — Export**: CSV für Excel und TSV für Anki.
+SM-2 optimiert auf dauerhaftes Behalten mit möglichst wenigen Wiederholungen. Vor einem
+festen Termin ist das die falsche Zielgröße — eine Karte mit 15 Tagen Intervall sieht man
+vor einer Prüfung in zehn Tagen kein einziges Mal wieder. Ist auf dem Stapel ein `examDate`
+gesetzt, deckelt der Scheduler die Intervalle deshalb auf die **halbe Restzeit**
+(mindestens ein Tag), damit jede Karte vorher mindestens einmal wiederkommt. Ohne Termin
+bleibt es beim normalen SM-2. Der Termin hängt am einzelnen Stapel, nicht am Ordner:
+mehrere Stapel eines Moduls können auf verschiedene Klausuren zielen.
+
+### Freies Üben
+
+`/decks/:id/study?frei=1` geht alle Karten des Stapels gemischt durch, unabhängig von der
+Fälligkeit. Es wird kein Review geschickt, die Wiederholungszeiten bleiben also unverändert
+— die Runde läuft rein im Browser über `GET /api/decks/{id}/cards`. "Nochmal" (Taste 1)
+legt die Karte ans Ende der Runde, "Weiter" (Taste 2) hakt sie ab. In der Stapelansicht
+steht der Link neben „Lernen".
+
+## Export
 
 ```
 GET /api/decks/{id}/export?format=csv    Semikolon-getrennt, UTF-8 mit BOM
@@ -154,79 +230,25 @@ importieren. Da TSV keine Maskierung kennt, werden dort Zeilenumbrüche zu `<br>
 Tabulatoren zu Leerzeichen; Leerzeichen in Tags werden zu Bindestrichen, weil Anki Tags am
 Leerzeichen trennt.
 
-**Organisation**: Ordner, Zusammenführen und Fälligkeiten je Stapel — Zugaben nach M7,
-sobald die Stapelliste zweistellig wird.
+## Sicherung und Wiederherstellung
+
+`stop.bat` legt bei jedem Herunterfahren einen `pg_dump` nach `backups\JJJJ-MM-TT.sql` —
+eine Datei pro Tag, mehrere Stopps am selben Tag überschreiben sich. Der Ordner ist von
+`.gitignore` ausgeschlossen: Die Dumps enthalten den kompletten Lernstand.
+
+Zurückspielen (der Dump ist ein einfacher SQL-Dump ohne `--clean`, die Datenbank muss also
+leer sein):
 
 ```
-GET    /api/folders
-POST   /api/folders               Body: { "name": "Modul Datenbanken" }
-PATCH  /api/folders/{id}          umbenennen
-DELETE /api/folders/{id}          die enthaltenen Stapel bleiben bestehen
-
-POST   /api/decks/{id}/merge      Body: { "sourceDeckId": "..." }
+docker compose down -v
+docker compose up -d --wait
+docker exec -i flashcards-postgres psql -U flashcards -d flashcards < backups\2026-09-15.sql
 ```
 
-- **Fälligkeiten**: Liste und Detailseite zeigen, wie viele Karten heute noch offen sind
-  (Überfälliges eingeschlossen) und wann die nächste fällig wird. Beides kommt aus
-  derselben Abfrage wie die Kartenzahl — eine Zählung je Stapel wäre ein N+1-Problem.
-- **Umbenennen** läuft über das bestehende `PATCH /api/decks/{id}`.
-- **Zusammenführen** hängt alle Karten des Quellstapels samt Lernstand an den Zielstapel
-  und löscht die leere Hülle. Doppelte Karten werden dabei nicht erkannt.
-- **Ordner** gruppieren Stapel, etwa je Uni-Modul, und sind flach: ein Stapel liegt in
-  höchstens einem Ordner, Ordner enthalten keine Ordner. Ein gelöschter Ordner nimmt seine
-  Stapel nicht mit (`ON DELETE SET NULL`). In der Übersicht lassen sie sich auf- und
-  zuklappen; zugeklappte Ordner merkt sich der Browser.
-
-**Konvention der PATCH-Formate**: Ein Feld, das fehlt oder `null` ist, bleibt unverändert;
-ein **leerer String** leert es. Das gilt für `description`, `examDate` und `folderId`
-gleichermaßen. Der naheliegende Weg über `Optional` funktioniert hier nicht: Jackson macht
-aus einem fehlenden `Optional`-Feld ein `Optional.empty()`, womit "nicht mitgeschickt"
-nicht mehr von "ausdrücklich `null`" zu unterscheiden ist — jedes Teil-PATCH hätte den
-Prüfungstermin gelöscht.
-
-## Voraussetzungen
-
-- JDK 21 oder neuer (getestet mit JDK 24)
-- Maven 3.9+
-- Node.js 22+ und npm
-- Docker Desktop
-
-## Start
-
-```bash
-cp .env.example .env
-```
-
-Unter Windows nehmen dir zwei Skripte in der Projektwurzel die drei Schritte ab:
-`start.bat` fährt Postgres, Backend und Frontend hoch und öffnet den Browser,
-`stop.bat` legt vorher einen Dump nach `backups/YYYY-MM-DD.sql` und fährt die Container
-herunter. Die Sicherungen bleiben lokal — sie enthalten den kompletten Lernstand.
-
-Von Hand geht es so:
-
-1. **Postgres starten** (Projektwurzel):
-
-   ```bash
-   docker compose up -d
-   ```
-
-2. **Backend starten** (Ordner `backend`) — läuft auf http://127.0.0.1:8080:
-
-   ```bash
-   mvn spring-boot:run
-   ```
-
-3. **Frontend starten** (Ordner `frontend`) — läuft auf http://localhost:4200:
-
-   ```bash
-   npm start
-   ```
-
-Die Startseite zeigt den Status von Backend und Datenbank. Direkt prüfen lässt sich das mit:
-
-```bash
-curl http://localhost:8080/api/health
-```
+`docker compose down -v` löscht das Volume mitsamt dem bisherigen Stand — vorher sicher
+sein, dass der Dump der richtige ist. Die letzte Zeile gehört in `cmd`, nicht in
+PowerShell: PowerShell kennt `<` nicht und macht beim Durchpipen UTF-8 mit BOM daraus, was
+`psql` nicht mag.
 
 ## Tests
 
@@ -247,6 +269,10 @@ npm test
 | Variable | Bedeutung | Default |
 |---|---|---|
 | `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | Zugangsdaten der lokalen Datenbank | `flashcards` |
-| `GEMINI_API_KEY` | Google-AI-Studio-Key, wird erst ab M4 benötigt | — |
+| `GEMINI_API_KEY` | Google-AI-Studio-Key, wird für die Generierung benötigt | — |
+| `GEMINI_DAILY_BUDGET` | Anfragen pro Tag, überschreibt `llm.gemini.daily-request-budget` | `20` |
+| `LLM_PROBE_ENABLED` | schaltet den Testendpunkt `/api/llm/probe` frei | `false` |
 
-Der API-Key gehört ausschließlich in `.env` (per `.gitignore` ausgeschlossen), niemals ins Repository.
+Der API-Key gehört ausschließlich in `.env` (per `.gitignore` ausgeschlossen), niemals ins
+Repository. Postgres ist in `docker-compose.yml` an `127.0.0.1` gebunden und damit nicht
+aus dem Netz erreichbar.
