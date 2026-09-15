@@ -61,7 +61,7 @@ public class GenerationService {
     /**
      * Dokumente ohne Textebene haben nichts beizutragen. Sie hier abzulehnen ist
      * ehrlicher, als sie stillschweigend zu ueberspringen und am Ende null Karten
-     * zu liefern (siehe Abschnitt 7.1 des Projektplans).
+     * zu liefern.
      */
     private List<UUID> validateDocuments(List<UUID> requestedIds) {
         List<UUID> distinctIds = requestedIds.stream().distinct().toList();

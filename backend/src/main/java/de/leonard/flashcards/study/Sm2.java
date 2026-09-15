@@ -9,7 +9,7 @@ import java.time.temporal.ChronoUnit;
 import org.springframework.stereotype.Component;
 
 /**
- * SM-2 nach Abschnitt 10 des Projektplans, erweitert um Lernschritte nach Anki-Vorbild.
+ * SM-2 nach Wozniaks Originalalgorithmus, erweitert um Lernschritte nach Anki-Vorbild.
  * Bewusst frei von Datenbank und Entitaeten: eine reine Rechnung, die sich vollstaendig
  * durchtesten laesst.
  *

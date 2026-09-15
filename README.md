@@ -133,7 +133,7 @@ PATCH  /api/cards/{id}
 DELETE /api/cards/{id}
 ```
 
-Neue Karten starten mit den SM-2-Werten aus dem Plan (`easeFactor` 2.5, `intervalDays` 0,
+Neue Karten starten mit den SM-2-Startwerten (`easeFactor` 2.5, `intervalDays` 0,
 `repetitions` 0), stehen auf dem ersten Lernschritt (`learningStep` 0) und sind sofort
 fällig.
 

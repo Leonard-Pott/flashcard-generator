@@ -31,7 +31,7 @@ class DocumentPersistenceTest {
 
     @Test
     void storesTextFarBeyondTheDefaultColumnLength() {
-        // Der Default waere VARCHAR(255) - genau der Fallstrick aus dem Projektplan.
+        // Der Default waere VARCHAR(255) - genau der Fallstrick, den dieser Test absichert.
         String longText = "Lorem ipsum dolor sit amet. ".repeat(5000);
         Document document = new Document("skript.pdf", "application/pdf", 2_000_000L);
         document.markExtracted(longText);

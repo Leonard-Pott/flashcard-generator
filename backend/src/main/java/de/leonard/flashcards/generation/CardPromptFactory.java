@@ -5,8 +5,8 @@ import org.springframework.stereotype.Component;
 import de.leonard.flashcards.deck.Language;
 
 /**
- * Baut System- und User-Prompt. Die inhaltlichen Vorgaben stammen aus Abschnitt 7.2
- * des Projektplans - sie machen den Unterschied zwischen brauchbaren und wertlosen Karten.
+ * Baut System- und User-Prompt. An den inhaltlichen Vorgaben haengt alles - sie machen
+ * den Unterschied zwischen brauchbaren und wertlosen Karten.
  */
 @Component
 public class CardPromptFactory {

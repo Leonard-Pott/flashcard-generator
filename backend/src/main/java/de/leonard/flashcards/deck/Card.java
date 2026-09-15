@@ -21,7 +21,7 @@ import jakarta.persistence.Table;
 @Table(name = "cards")
 public class Card {
 
-    /** Startwert des SM-2-Algorithmus (Abschnitt 10 des Projektplans). */
+    /** Startwert des Easiness-Faktors, wie ihn SM-2 vorgibt. */
     public static final double INITIAL_EASE_FACTOR = 2.5;
 
     @Id
