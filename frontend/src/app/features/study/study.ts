@@ -39,6 +39,16 @@ const RATINGS: Rating[] = [
  */
 const AUTO_RELOAD_WINDOW_MS = 15 * 60_000;
 
+/** Fisher-Yates, damit das freie Üben nicht jedes Mal dieselbe Reihenfolge hat. */
+function shuffled<T>(items: readonly T[]): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
 @Component({
   selector: 'app-study',
   imports: [RouterLink],
@@ -47,8 +57,12 @@ const AUTO_RELOAD_WINDOW_MS = 15 * 60_000;
 })
 export class StudyPage {
   readonly id = input.required<string>();
+  /** Query-Parameter ?frei=1: alle Karten durchgehen, ohne die Wiederholungszeiten anzufassen. */
+  readonly frei = input('');
 
   private readonly api = inject(ApiService);
+
+  protected readonly free = computed(() => this.frei() === '1');
 
   protected readonly ratings = RATINGS;
 
@@ -67,13 +81,20 @@ export class StudyPage {
   /** Wartet auf die nächste Karte aus den Lernschritten. */
   private reloadTimer?: ReturnType<typeof setTimeout>;
 
+  /** Restliche Karten beim freien Üben; die erste davon liegt in card(). */
+  private readonly queue = signal<Card[]>([]);
+
   constructor() {
     inject(DestroyRef).onDestroy(() => clearTimeout(this.reloadTimer));
 
     effect(() => {
       const deckId = this.id();
       this.loadDeck(deckId);
-      this.loadNext(deckId);
+      if (this.free()) {
+        this.loadAll(deckId);
+      } else {
+        this.loadNext(deckId);
+      }
     });
   }
 
@@ -106,6 +127,48 @@ export class StudyPage {
         this.loading.set(false);
       }
     });
+  }
+
+  /** Freies Üben: alle Karten des Stapels, gemischt, unabhängig von der Fälligkeit. */
+  private loadAll(deckId: string): void {
+    this.loading.set(true);
+    this.revealed.set(false);
+    clearTimeout(this.reloadTimer);
+
+    this.api.cards(deckId).subscribe({
+      next: (cards) => {
+        this.setQueue(shuffled(cards));
+        this.error.set(null);
+        this.loading.set(false);
+      },
+      error: (err: unknown) => {
+        this.error.set(apiErrorMessage(err));
+        this.loading.set(false);
+      }
+    });
+  }
+
+  private setQueue(cards: Card[]): void {
+    this.queue.set(cards);
+    this.card.set(cards[0] ?? null);
+    this.dueCount.set(cards.length);
+    this.revealed.set(false);
+  }
+
+  /**
+   * Freies Üben: Karte abhaken. {@code again} legt sie ans Ende zurück. Es wird nichts
+   * ans Backend gemeldet, die Wiederholungszeiten bleiben also unverändert.
+   */
+  protected advance(again: boolean): void {
+    const [current, ...rest] = this.queue();
+    if (!current) {
+      return;
+    }
+
+    this.setQueue(again ? [...rest, current] : rest);
+    if (!again) {
+      this.reviewedCount.update((count) => count + 1);
+    }
   }
 
   /**
@@ -160,6 +223,14 @@ export class StudyPage {
       if (event.key === ' ' || event.key === 'Enter') {
         event.preventDefault();
         this.reveal();
+      }
+      return;
+    }
+
+    if (this.free()) {
+      if (event.key === '1' || event.key === '2') {
+        event.preventDefault();
+        this.advance(event.key === '1');
       }
       return;
     }

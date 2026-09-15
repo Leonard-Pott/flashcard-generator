@@ -4,6 +4,10 @@
   <h2>{{ deck.name }}</h2>
 }
 
+@if (free()) {
+  <p class="muted">Freies Üben — die Wiederholungszeiten bleiben unverändert.</p>
+}
+
 @if (error(); as message) {
   <p class="error">{{ message }}</p>
 }
@@ -12,7 +16,11 @@
   <p class="muted">Lade Karte …</p>
 } @else if (card(); as card) {
   <p class="counter">
-    Noch {{ dueCount() }} fällig
+    @if (free()) {
+      Noch {{ dueCount() }} Karte(n)
+    } @else {
+      Noch {{ dueCount() }} fällig
+    }
     @if (reviewedCount() > 0) {
       · {{ reviewedCount() }} bearbeitet
     }
@@ -41,6 +49,11 @@
 
   @if (!revealed()) {
     <button type="button" class="primary" (click)="reveal()">Aufdecken <kbd>Leertaste</kbd></button>
+  } @else if (free()) {
+    <div class="ratings">
+      <button type="button" (click)="advance(true)">Nochmal <kbd>1</kbd></button>
+      <button type="button" (click)="advance(false)">Weiter <kbd>2</kbd></button>
+    </div>
   } @else {
     <div class="ratings">
       @for (rating of ratings; track rating.quality) {
@@ -50,6 +63,14 @@
       }
     </div>
   }
+} @else if (free()) {
+  <p class="done">Einmal durch.</p>
+  @if (reviewedCount() > 0) {
+    <p class="muted">{{ reviewedCount() }} Karte(n) frei geübt, ohne Einfluss auf die Zeiten.</p>
+  } @else {
+    <p class="muted">Dieser Stapel enthält noch keine Karten.</p>
+  }
+  <p><a [routerLink]="['/decks', id()]">Zum Stapel</a></p>
 } @else {
   <p class="done">Für den Moment geschafft.</p>
   @if (reviewedCount() > 0) {

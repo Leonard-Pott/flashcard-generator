@@ -14,6 +14,7 @@
     }
     @if (deck.cardCount > 0) {
       <a class="study-link" [routerLink]="['/decks', deck.id, 'study']">Lernen</a>
+      <a class="study-link" [routerLink]="['/decks', deck.id, 'study']" [queryParams]="{ frei: 1 }">Frei üben</a>
       <span class="exports">
         Export:
         <a [href]="exportUrl('csv')" download>CSV</a>

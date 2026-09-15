@@ -117,6 +117,12 @@ derselben Sitzung, nach Anki-Vorbild:
 - Tagesintervalle liegen auf dem **Tagesbeginn**, nicht auf der Uhrzeit der Bewertung —
   abends gelernt heißt am nächsten Morgen fällig.
 
+**Freies Üben**: `/decks/:id/study?frei=1` geht alle Karten des Stapels gemischt durch,
+unabhängig von der Fälligkeit. Es wird kein Review geschickt, die Wiederholungszeiten
+bleiben also unverändert — die Runde läuft rein im Browser über `GET /api/decks/{id}/cards`.
+"Nochmal" (Taste 1) legt die Karte ans Ende der Runde, "Weiter" (Taste 2) hakt sie ab.
+In der Stapelansicht steht der Link neben „Lernen".
+
 Deshalb ist `dueAt` ein Zeitstempel und kein Datum: "in 10 Minuten" muss ausdrückbar sein.
 `learningStep` ist der Index im Schrittplan und `-1`, sobald die Karte im Tagesrhythmus
 läuft. Die Lern-View lädt sich selbst nach, wenn die nächste Karte in unter 15 Minuten

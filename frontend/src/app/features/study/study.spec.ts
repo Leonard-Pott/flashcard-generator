@@ -227,6 +227,52 @@ describe('StudyPage', () => {
     expect(text()).toContain('noch keine Karten');
   });
 
+  it('should walk through every card in free practice without touching the schedule', async () => {
+    fixture.componentRef.setInput('frei', '1');
+    await fixture.whenStable();
+    httpMock.expectOne(deckUrl).flush(deck);
+    // Nicht der Fälligkeits-Endpunkt, sondern alle Karten des Stapels.
+    httpMock.expectNone(nextUrl);
+    httpMock
+      .expectOne(`${deckUrl}/cards`)
+      .flush([card({ id: 'c1', front: 'Erste' }), card({ id: 'c2', front: 'Zweite' })]);
+    await fixture.whenStable();
+
+    expect(text()).toContain('Noch 2 Karte(n)');
+
+    // Beide Karten abarbeiten - egal in welcher Reihenfolge das Mischen sie legt.
+    for (let i = 0; i < 2; i++) {
+      buttonWith('Aufdecken').click();
+      await fixture.whenStable();
+      buttonWith('Weiter').click();
+      await fixture.whenStable();
+    }
+
+    expect(text()).toContain('Einmal durch.');
+    expect(text()).toContain('2 Karte(n) frei geübt');
+    // Kein einziger Review ist rausgegangen, die Wiederholungszeiten bleiben stehen.
+    httpMock.expectNone({ method: 'POST', url: `${environment.apiBaseUrl}/cards/c1/review` });
+    httpMock.expectNone({ method: 'POST', url: `${environment.apiBaseUrl}/cards/c2/review` });
+  });
+
+  it('should put a card back at the end of the free practice round', async () => {
+    fixture.componentRef.setInput('frei', '1');
+    await fixture.whenStable();
+    httpMock.expectOne(deckUrl).flush(deck);
+    httpMock.expectOne(`${deckUrl}/cards`).flush([card({ id: 'c1', front: 'Einzige' })]);
+    await fixture.whenStable();
+
+    buttonWith('Aufdecken').click();
+    await fixture.whenStable();
+    buttonWith('Nochmal').click();
+    await fixture.whenStable();
+
+    // Zurueckgelegt: dieselbe Karte, wieder verdeckt, Zaehler unveraendert.
+    expect(text()).toContain('Einzige');
+    expect(text()).toContain('Noch 1 Karte(n)');
+    expect(text()).not.toContain('Eine ungeplante Unterbrechung.');
+  });
+
   it('should surface a backend error', async () => {
     await fixture.whenStable();
     httpMock.expectOne(deckUrl).flush(deck);
