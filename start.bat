@@ -1,13 +1,30 @@
 @echo off
-REM Startet Postgres, Backend und Frontend im Hintergrund und oeffnet Chrome.
+REM Startet Postgres, Backend und Frontend im Hintergrund und oeffnet den Browser.
 REM Beenden mit stop.bat - die Server laufen ohne Fenster weiter.
 cd /d "%~dp0"
 if not exist logs mkdir logs
 
 docker info >nul 2>&1 && goto :db
+REM Standardpfad von Docker Desktop. Liegt es woanders oder ist es eine andere
+REM Docker-Variante, wird nicht geraten - dann startet es der Mensch selbst.
+set "DOCKER_EXE=C:\Program Files\Docker\Docker\Docker Desktop.exe"
+if not exist "%DOCKER_EXE%" (
+  echo Docker laeuft nicht und ist nicht unter "%DOCKER_EXE%" zu finden.
+  echo Bitte Docker von Hand starten und start.bat erneut ausfuehren.
+  pause
+  exit /b 1
+)
 echo Docker Desktop wird gestartet...
-start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+start "" "%DOCKER_EXE%"
+set DOCKERTRIES=0
 :dockerwait
+set /a DOCKERTRIES+=1
+if %DOCKERTRIES% gtr 40 (
+  echo.
+  echo Docker antwortet auch nach zwei Minuten nicht - bitte von Hand nachsehen.
+  pause
+  exit /b 1
+)
 timeout /t 3 >nul
 docker info >nul 2>&1 || goto :dockerwait
 
@@ -33,7 +50,9 @@ echo Warte auf das Frontend...
 timeout /t 2 >nul
 curl -s -o nul http://localhost:4200 || goto :frontendwait
 
-start chrome http://localhost:4200
+REM Leerer Titel, damit start die URL nicht als Fenstertitel missversteht. Oeffnet
+REM den Standardbrowser - kein fest verdrahteter Chrome.
+start "" http://localhost:4200
 exit /b 0
 
 :fail
