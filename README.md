@@ -21,8 +21,6 @@ die knappe Ressource, an der sich einiges im Code ausrichtet.
 Rund 8.500 Zeilen Java und 3.000 Zeilen TypeScript, abgesichert durch 255 Backend-Tests in
 29 Testklassen und 69 Frontend-Tests.
 
-Spezifikation und Meilensteine: [flashcard-generator-plan.md](flashcard-generator-plan.md)
-
 ## Was daran technisch interessant ist
 
 - **[Spaced Repetition mit Lernschritten](#lernschritte)** — SM-2 kennt nur ganze Tage, eine
