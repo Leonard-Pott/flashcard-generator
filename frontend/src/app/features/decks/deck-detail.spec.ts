@@ -276,7 +276,10 @@ describe('DeckDetailPage', () => {
 
   /** Der Fehler, der den Anlass gab: ein Teil-PATCH darf den Termin nicht mitnehmen. */
   it('should send only the changed field when moving into a folder', async () => {
-    await loadWith([card()], { ...deck, examDate: '2026-09-01' });
+    // Relativ zu heute: ein fest verdrahtetes Datum liegt irgendwann in der
+    // Vergangenheit, und dann zeigt die Seite "Termin vorbei" statt "Noch ... Tage".
+    const kuenftig = new Date(Date.now() + 10 * 86_400_000).toLocaleDateString('sv-SE');
+    await loadWith([card()], { ...deck, examDate: kuenftig });
 
     const select = el<HTMLSelectElement>('select[name="folder"]');
     select.value = '';
@@ -285,7 +288,7 @@ describe('DeckDetailPage', () => {
 
     const request = httpMock.expectOne({ method: 'PATCH', url: deckUrl });
     expect(Object.keys(request.request.body as object)).toEqual(['folderId']);
-    request.flush({ ...deck, examDate: '2026-09-01' });
+    request.flush({ ...deck, examDate: kuenftig });
     await fixture.whenStable();
 
     expect(text()).toContain('Noch');

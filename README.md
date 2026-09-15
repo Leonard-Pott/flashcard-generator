@@ -1,12 +1,67 @@
 # Karteikarten-Generator
 
-Lokale Single-User-Webanwendung: Dokumente (PDF, DOCX, PPTX, TXT, Markdown) hochladen,
-daraus per LLM Karteikarten generieren, bearbeiten, lernen und exportieren.
+Lokale Webanwendung, die aus Vorlesungsunterlagen automatisch Karteikarten erzeugt und sie
+nach einem Spaced-Repetition-Verfahren abfragt: Dokument hochladen (PDF, DOCX, PPTX, TXT,
+Markdown) → Text extrahieren → per LLM Frage-Antwort-Paare generieren → bearbeiten →
+lernen → nach Anki oder Excel exportieren.
 
-Angular 21 im Frontend, Spring Boot 3.5 im Backend, Postgres 16 im Container. Alles läuft
-auf dem eigenen Rechner; nach außen geht nur der Aufruf an die Gemini-API.
+Entstanden als Werkzeug für das eigene Studium. Das prägt den Entwurf: Single-User, alles
+auf dem eigenen Rechner, und der kostenlose Gemini-Tarif mit **20 Anfragen pro Tag** ist
+die knappe Ressource, an der sich einiges im Code ausrichtet.
+
+| Bereich | Technologie |
+|---|---|
+| Backend | Java 21, Spring Boot 3.5, Spring Data JPA, Flyway |
+| Datenbank | PostgreSQL 16 im Container |
+| Frontend | Angular 21, Standalone Components, Signals |
+| LLM | Google Gemini über Springs `RestClient` — kein SDK |
+| Extraktion | Apache Tika |
+| Tests | JUnit 5, Mockito, Testcontainers, WireMock (Backend), Vitest mit jsdom (Frontend) |
+
+Rund 8.500 Zeilen Java und 3.000 Zeilen TypeScript, abgesichert durch 255 Backend-Tests in
+29 Testklassen und 69 Frontend-Tests.
 
 Spezifikation und Meilensteine: [flashcard-generator-plan.md](flashcard-generator-plan.md)
+
+## Was daran technisch interessant ist
+
+- **[Spaced Repetition mit Lernschritten](#lernschritte)** — SM-2 kennt nur ganze Tage, eine
+  neue Karte käme selbst nach "Nochmal" frühestens morgen wieder. Darüber liegt deshalb eine
+  Minutenebene nach Anki-Vorbild, weshalb `dueAt` ein Zeitstempel ist und kein Datum.
+- **[Der Prüfungstermin verändert die Zielgröße](#prüfungstermin)** — SM-2 optimiert auf
+  dauerhaftes Behalten mit wenigen Wiederholungen. Vor einer Klausur in zehn Tagen ist das
+  falsch: Eine Karte mit 15 Tagen Intervall sieht man vorher kein einziges Mal. Der
+  Scheduler deckelt die Intervalle dann auf die halbe Restzeit.
+- **[Chunking am Kontingent ausgerichtet, nicht am Modell](#generierung)** — nicht die
+  Kontextlänge ist knapp, sondern die 20 Anfragen pro Tag. Also große Abschnitte statt
+  kleiner, und Deckblätter und Inhaltsverzeichnisse vorher aussieben, damit keine Anfrage
+  für Text ohne Lernstoff draufgeht.
+- **[Umgang mit einer unzuverlässigen Fremd-API](#anbindung-an-gemini)** — Drosselung,
+  exponentielles Backoff, und ein Lauf, der einzelne gescheiterte Abschnitte überspringt,
+  statt alles zu verwerfen.
+- **[Ein Jackson-Fallstrick, der Daten gelöscht hat](#konvention-der-patch-formate)** — der
+  naheliegende Weg über `Optional` machte "nicht mitgeschickt" ununterscheidbar von
+  "ausdrücklich `null`", womit jedes Teil-PATCH den Prüfungstermin löschte.
+
+## Architektur
+
+Geschnitten wird nach Fachlichkeit, nicht nach Schichten — ein Paket enthält Controller,
+Service und Repository seines Themas:
+
+```
+backend/src/main/java/de/leonard/flashcards/
+  document/     Upload und Textextraktion über Tika
+  generation/   Chunking, Prompting, asynchrone Job-Verarbeitung
+  llm/          Gemini-Client mit Drosselung und Retry
+  deck/         Stapel, Karten, Ordner
+  study/        SM-2, Lernschritte, Fälligkeiten
+  export/       CSV und Anki-TSV
+  config/       CORS und einheitliche Fehlerantworten
+```
+
+Das Schema gehört Flyway (`ddl-auto: validate`), Hibernate darf nichts anlegen oder ändern.
+Der Gemini-Zugriff liegt hinter einem `LlmClient`-Interface, was die Generierungstests ohne
+echte API-Aufrufe möglich macht.
 
 ## Schnellstart
 
@@ -230,6 +285,19 @@ importieren. Da TSV keine Maskierung kennt, werden dort Zeilenumbrüche zu `<br>
 Tabulatoren zu Leerzeichen; Leerzeichen in Tags werden zu Bindestrichen, weil Anki Tags am
 Leerzeichen trennt.
 
+## Tests
+
+```bash
+cd backend && mvn test      # 255 Tests, Docker muss laufen
+cd frontend && npm test     # 69 Tests
+```
+
+Die Persistenz- und Migrationstests starten ein echtes Postgres über Testcontainers statt
+gegen eine In-Memory-Datenbank zu laufen — sonst prüfen sie H2-Verhalten und nicht das, was
+später produktiv läuft. Der Gemini-Client wird gegen WireMock getestet, inklusive der
+Retry- und Drosselungspfade; die Zeit dafür liegt hinter einer `Sleeper`-Abstraktion, damit
+die Tests keine 30 Sekunden warten.
+
 ## Sicherung und Wiederherstellung
 
 `stop.bat` legt bei jedem Herunterfahren einen `pg_dump` nach `backups\JJJJ-MM-TT.sql` —
@@ -250,20 +318,6 @@ sein, dass der Dump der richtige ist. Die letzte Zeile gehört in `cmd`, nicht i
 PowerShell: PowerShell kennt `<` nicht und macht beim Durchpipen UTF-8 mit BOM daraus, was
 `psql` nicht mag.
 
-## Tests
-
-Backend (die Persistenz-Tests starten Postgres über Testcontainers, Docker muss laufen):
-
-```bash
-mvn test
-```
-
-Frontend:
-
-```bash
-npm test
-```
-
 ## Konfiguration
 
 | Variable | Bedeutung | Default |
@@ -274,5 +328,16 @@ npm test
 | `LLM_PROBE_ENABLED` | schaltet den Testendpunkt `/api/llm/probe` frei | `false` |
 
 Der API-Key gehört ausschließlich in `.env` (per `.gitignore` ausgeschlossen), niemals ins
-Repository. Postgres ist in `docker-compose.yml` an `127.0.0.1` gebunden und damit nicht
-aus dem Netz erreichbar.
+Repository.
+
+## Grenzen
+
+Bewusst nicht enthalten, weil die Anwendung für genau einen Nutzer auf genau einem Rechner
+gedacht ist: keine Authentifizierung, keine Mandantentrennung, kein Deployment-Pfad. Backend
+und Datenbank sind an `127.0.0.1` gebunden und damit nicht aus dem Netz erreichbar — das ist
+die Sicherheitsannahme, auf der der Rest aufbaut. Wollte man die Anwendung ins Netz stellen,
+wäre Authentifizierung der erste Schritt, nicht der letzte.
+
+Fachlich offen: Beim Zusammenführen zweier Stapel werden doppelte Karten nicht erkannt, und
+die Generierung prüft die inhaltliche Richtigkeit der Karten nicht — sie kommen von einem
+Sprachmodell und wollen durchgesehen werden.
